@@ -1,0 +1,19 @@
+# create new user
+# adduser --disabled-login --no-create-home --gecos brobot brobot
+# chown -r brobot:brobot /opt/brobot
+
+[Unit]
+Description=Brobot Discord Bot
+After=network.target
+
+[Service]
+Type=simple
+User=brobot
+Group=brobot
+WorkingDirectory=/opt/brobot
+EnvironmentFile=/opt/brobot/brobot.env
+ExecStart=/opt/brobot/.env/bin/python /opt/brobot/brobot.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

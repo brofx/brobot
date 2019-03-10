@@ -1,32 +1,30 @@
 client.on('message', message => {
-        var color = message.content;
-        if (color.startsWith("!color")){
-		if (message.content != "!color list"){
+    var color = message.content;
+    if (color.startsWith("!color")) {
+        if (message.content != "!color list") {
 
-	        	teams = ["Team Green","Team Purple","Team Red","Team Blue","Team Yellow","Team Orange","Team White"];
+            teams = ["Team Green", "Team Purple", "Team Red", "Team Blue", "Team Yellow", "Team Orange", "Team White"];
 
-        		for (var i = teams.length - 1; i >= 0; i--) {
-        			var role = message.guild.roles.find(role => role.name === teams[i]);
-        			message.member.removeRole(role)
-        			.then(console.log)
-    		    	.catch(console.error);
-                    
-        		}
-
-
-		}
-
-        
-
+            for (var i = teams.length - 1; i >= 0; i--) {
+                var role = message.guild.roles.find(role => role.name === teams[i]);
+                message.member.removeRole(role)
+                    .then(console.log)
+                    .catch(console.error);
+            }
+        }
         sleep(200).then(() => {
-            switch(message.content){
+            switch (message.content) {
                 case "!color green":
-                	role = message.guild.roles.find(role => role.name === "Team Green");
-                	message.member.addRole(role);
+                    role = message.guild.roles.find(role => role.name === "Team Green");
+                    message.member.addRole(role);
                     message.channel.send('Added to Team Green!');
                     break;
+                case "!color pink":
+                    role = message.guild.roles.find(role => role.name === "Team Pink");
+                    message.member.addRole(role);
+                    message.channel.send('Added to Team Pink!');
+                    break;
                 case "!color purple":
-
                     role = message.guild.roles.find(role => role.name === "Team Purple");
                     message.member.addRole(role);
                     message.channel.send('Added to Team Purple!');
@@ -53,17 +51,16 @@ client.on('message', message => {
                     break;
                 case "!color white":
                     role = message.guild.roles.find(role => role.name === "Team White");
-    			    message.member.addRole(role);
-    			    message.channel.send('Added to Team White');
-    			    break;
-    		    case "!color list":
-    			    message.channel.send('You can select: Red, Orange, Yellow, Green, Blue, Purple, White');
-    			    break;
+                    message.member.addRole(role);
+                    message.channel.send('Added to Team White');
+                    break;
+                case "!color list":
+                    message.channel.send('You can select: Red, Orange, Yellow, Green, Blue, Purple, White');
+                    break;
                 default:
                     message.channel.send("Pick a different Color...");
-                    break;                                               
+                    break;
             }
-        
         })
     }
 });

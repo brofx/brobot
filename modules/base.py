@@ -6,7 +6,6 @@ class BaseModule(commands.Cog, name="Base Module"):
         self.bot = bot
 
     @commands.command()
-    @commands.ro
     @commands.guild_only()
     async def ping(self, ctx: commands.Context):
         await ctx.send("pong")

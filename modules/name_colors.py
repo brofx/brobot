@@ -9,10 +9,7 @@ class NameColors(commands.Cog, name="Name Colors"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.Cog.listener()
-    async def on_guild_join(self, guild: discord.Guild):
-        print("Joined Guild: {}".format(guild.name))
-
+    # TODO: Require 'member' role
     @commands.command()
     @commands.guild_only()
     async def color(self, ctx: commands.Context, color=None):

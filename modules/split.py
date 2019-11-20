@@ -11,7 +11,7 @@ class SplitModule(commands.Cog, name="Split Module"):
     # TODO? Only allow ops to use this? I wouldn't want it getting abused.
     @commands.command()
     @commands.guild_only()
-    async def split(self, ctx: commands.Context, other_channel: str = None):
+    async def split(self, ctx: commands.Context, *, other_channel: str = None):
         """Splits the members from the channel the user is in into the :other channel"""
 
         if not other_channel:
@@ -29,6 +29,9 @@ class SplitModule(commands.Cog, name="Split Module"):
         second_voice_chanel = discord.utils.find(
             lambda channel: channel.name.lower() == other_channel.lower() and channel.type == discord.ChannelType.voice,
             self.bot.get_all_channels())
+
+        if second_voice_chanel == current_voice_channel:
+            return await ctx.send("Syntax: !split <other voice channel to split to>")
 
         # Voice channel must actually exist to move users there.
         if not second_voice_chanel:

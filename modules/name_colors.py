@@ -12,9 +12,10 @@ class NameColors(commands.Cog, name="Name Colors"):
     @commands.command()
     @commands.guild_only()
     @commands.has_any_role("Member", "Operator")
-    async def color(self, ctx: commands.Context, color=None):
+    async def color(self, ctx: commands.Context, color: str = None):
         color = None if not color else color.lower()
 
+        # Verify that the color entered is a valid
         if not color or color not in VALID_COLORS:
             return await ctx.send(
                 "Choose a nickname color by saying \"!color <color>\". Valid colors: {}".format(
@@ -25,9 +26,12 @@ class NameColors(commands.Cog, name="Name Colors"):
         # TODO figure out how to cache the list of roles so this lookup doesn't need to happen every time
         roles_to_remove = [role for role in member.roles if role.name in COLOR_ROLES]
 
+        # Since the indexes for colors and their associated roles are identical, the role can be looked up using the
+        # index of the provided color
         color_index = VALID_COLORS.index(color)
         role_to_add = [role for role in ctx.guild.roles if role.name == COLOR_ROLES[color_index]][0]
 
+        # Only add the role if they don't have it.
         if role_to_add not in member.roles:
             await member.remove_roles(*roles_to_remove, atomic=True)
             await member.add_roles(role_to_add, atomic=True)

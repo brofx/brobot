@@ -1,5 +1,7 @@
 venv/
 env/
+.env/
+.vscode/
 env.sh
 brobot.env
 .idea/

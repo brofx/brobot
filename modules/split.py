@@ -8,6 +8,7 @@ class SplitModule(commands.Cog, name="Split Module"):
     def __init__(self, bot: commands.Bot):
         self.bot: commands.Bot = bot
 
+    # TODO? Only allow ops to use this? I wouldn't want it getting abused.
     @commands.command()
     @commands.guild_only()
     async def split(self, ctx: commands.Context, other_channel: str = None):

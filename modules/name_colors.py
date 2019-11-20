@@ -9,9 +9,9 @@ class NameColors(commands.Cog, name="Name Colors"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # TODO: Require 'member' role
     @commands.command()
     @commands.guild_only()
+    @commands.has_any_role("Member", "Operator")
     async def color(self, ctx: commands.Context, color=None):
         color = None if not color else color.lower()
 

@@ -11,7 +11,8 @@ brobot_modules = [
     "modules.roll",
     "modules.stocks",
     "modules.silly",
-    "modules.f1"
+    "modules.f1",
+    "modules.urbandict"
 ]
 
 

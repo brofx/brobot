@@ -9,7 +9,8 @@ brobot_modules = [
     "modules.base",
     "modules.name_colors",
     "modules.roll",
-    "modules.stocks"
+    "modules.stocks",
+    "modules.silly"
 ]
 
 

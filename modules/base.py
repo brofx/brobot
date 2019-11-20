@@ -11,9 +11,10 @@ class BaseModule(commands.Cog, name="Base Module"):
         await ctx.send("pong")
 
     #@commands.Cog.listener()
-    #async def on_message(self, message):
+    #async def on_message(self, message: discord.Message):
     #    """Demo for listening to all messages in a module"""
-    #    if message.author.bot: return
+    #    if message.author.bot:
+    #       return
     #    if "yoyo" in message.content: 
     #        return await message.channel.send("Got a message: " + message.content)
 

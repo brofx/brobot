@@ -13,7 +13,8 @@ brobot_modules = [
     "modules.silly",
     "modules.f1",
     "modules.urbandict",
-    "modules.choose"
+    "modules.choose",
+    "modules.split"
 ]
 
 

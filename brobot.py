@@ -7,7 +7,8 @@ discord_key: str = os.getenv("DISCORD_KEY")
 
 brobot_modules = [
     "modules.base",
-    "modules.name_colors"
+    "modules.name_colors",
+    "modules.roll"
 ]
 
 

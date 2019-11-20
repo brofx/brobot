@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime, timedelta
 import re
 from random import choice
 
@@ -25,12 +25,12 @@ class Silly(commands.Cog, name="Silly Module"):
     @commands.guild_only()
     async def expanse(self, ctx: commands.Context):
         """Provides a countdown to when Season 4 of The Expanse releases."""
-        today = datetime.datetime.now()
-        expanse_date = datetime.datetime(2019, 12, 13, 18, 00, 0)
-        delta = expanse_date - today
-        hours, remainder = divmod(delta.seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        output = "{days} days, {hours} hours, {minutes} minutes, and {seconds} seconds until S4 of The Expanse!".format(
+        today: datetime = datetime.now()
+        expanse_date: datetime = datetime(2019, 12, 13, 18, 00, 0)
+        delta: timedelta = expanse_date - today
+        hours: int, remainder: int = divmod(delta.seconds, 3600)
+        minutes: int, seconds: int = divmod(remainder, 60)
+        output: str = "{days} days, {hours} hours, {minutes} minutes, and {seconds} seconds until S4 of The Expanse!".format(
             days=delta.days, hours=hours, minutes=minutes, seconds=seconds)
 
         return await ctx.send(output)
@@ -40,9 +40,9 @@ class Silly(commands.Cog, name="Silly Module"):
     async def rather(self, ctx: commands.Context):
         """Gets a random 'Would You Rather' question from reddit."""
         # TODO: Store this header somewhere and actually adjust version
-        header = {"User-Agent": "BroBot/1.0 by github.com/brofx"}
+        header: dict = {"User-Agent": "BroBot/1.0 by github.com/brofx"}
         question_request = requests.get("http://www.reddit.com/r/wouldyourather.json?limit=100", headers=header).json()
-        question = choice(question_request["data"]["children"])["data"]["title"]
+        question: str = choice(question_request["data"]["children"])["data"]["title"]
         return await ctx.send(question)
 
     @commands.Cog.listener()

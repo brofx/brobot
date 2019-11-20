@@ -12,7 +12,7 @@ class F1(commands.Cog, name="Formula1 Module"):
     @commands.guild_only()
     async def f1(self, ctx: commands.Context):
         """Returns the next F1 race information."""
-        next_race = get_next_race()
+        next_race: str = get_next_race()
         if not next_race:
             return await ctx.send("No upcomming race.")
         return await ctx.send(next_race)
@@ -28,11 +28,11 @@ def get_next_race():
     result = requests.get(NEXT_RACE_URL)
 
     if result.ok:
-        root = result.json()["MRData"]
+        root: dict = result.json()["MRData"]
         if int(root["total"]) > 0:
-            raceTable = root["RaceTable"]
-            race = raceTable["Races"][0]
-            ret_val = "[#{race_num}] {season} **{race_name}**, {race_loc} @ {date} {time}".format(
+            raceTable: str = root["RaceTable"]
+            race: str = raceTable["Races"][0]
+            ret_val: str = "[#{race_num}] {season} **{race_name}**, {race_loc} @ {date} {time}".format(
                 race_num=raceTable["round"],
                 season=raceTable["season"],
                 race_name=race["raceName"],

@@ -1,3 +1,4 @@
+from typing import List
 import random
 
 from discord.ext import commands
@@ -14,7 +15,7 @@ class Choose(commands.Cog, name="Choose Module"):
         if not choices:
             return await ctx.send("Syntax: !choose Option 1 | Option 2 | Option 3 ...")
 
-        formatted_choices = [choice.strip() for choice in choices.split("|")]
+        formatted_choices: List[str] = [choice.strip() for choice in choices.split("|")]
 
         await ctx.send(random.choice(formatted_choices))
 

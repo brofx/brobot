@@ -19,7 +19,7 @@ class Roll(commands.Cog, name="Roll"):
         elif second < first:
             # Otherwise, both are are present and this is an invalid range
             return await ctx.send("Invalid range") 
-        result = random.randint(first, second)
+        result: int = random.randint(first, second)
         return await ctx.send("random({}, {}) = {}".format(first, second, result))
 
 

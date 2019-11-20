@@ -1,0 +1,24 @@
+name: CI
+on:
+  push:
+    branches:
+      - master
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Bump version and push tag
+      uses: anothrNick/github-tag-action@1.7.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      id: bump_version
+    - name: Build and publish Docker Image
+      run: |
+        docker build . --tag brobot:latest
+        docker login docker.pkg.github.com -u anothrNick -p "${GITHUB_TOKEN}"
+        docker tag brobot:latest docker.pkg.github.com/brofx/brobot/brobot:$VERSION
+        docker push docker.pkg.github.com/brofx/brobot/brobot:$VERSION
+      env:
+        VERSION: ${{ steps.bump_version.outputs.new_tag }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

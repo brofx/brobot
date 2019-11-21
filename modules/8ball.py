@@ -31,7 +31,7 @@ class EightBall(commands.Cog, name="Magic 8 Ball"):
                                "yes, gods plan",
                                "that's gonna be a no from me dawg",
                                "No, stop asking."]
-        return await random.choice(messages)
+        return await ctx.send(random.choice(messages))
 
 
 def setup(bot: commands.Bot):

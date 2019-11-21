@@ -7,6 +7,8 @@ import requests
 from discord.ext import commands
 
 GOOD_BOT_RE = re.compile(r'^good bot$', re.IGNORECASE)
+BAD_BOT_RE = re.compile(r'^bad bot$', re.IGNORECASE)
+FUCK_YOU = re.compile(r'^fuck.+(you.*)?brobot.*$', re.IGNORECASE)
 
 
 class Silly(commands.Cog, name="Silly Module"):
@@ -28,8 +30,8 @@ class Silly(commands.Cog, name="Silly Module"):
         today: datetime = datetime.now()
         expanse_date: datetime = datetime(2019, 12, 13, 18, 00, 0)
         delta: timedelta = expanse_date - today
-        hours: int, remainder: int = divmod(delta.seconds, 3600)
-        minutes: int, seconds: int = divmod(remainder, 60)
+        hours, remainder = divmod(delta.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
         output: str = "{days} days, {hours} hours, {minutes} minutes, and {seconds} seconds until S4 of The Expanse!".format(
             days=delta.days, hours=hours, minutes=minutes, seconds=seconds)
 
@@ -48,11 +50,20 @@ class Silly(commands.Cog, name="Silly Module"):
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         """Responds when someone calls the bot bad, implied sarcastically"""
-        if message.author.bot:
+
+        author: discord.Member = message.author
+
+        if author.bot:
             return
 
         if GOOD_BOT_RE.match(message.content):
             return await message.channel.send("bad human")
+
+        if BAD_BOT_RE.match(message.content):
+            return await message.channel.send("thank you {}!".format(author.mention))
+
+        if FUCK_YOU.match(message.content):
+            return await message.channel.send("thats not nice :(")
 
 
 def setup(bot: commands.Bot):

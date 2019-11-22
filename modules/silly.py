@@ -10,6 +10,28 @@ GOOD_BOT_RE = re.compile(r'^good bot$', re.IGNORECASE)
 BAD_BOT_RE = re.compile(r'^bad bot$', re.IGNORECASE)
 FUCK_YOU = re.compile(r'^fuck.+(you.*)?brobot.*$', re.IGNORECASE)
 
+GOOD_BOT_RESPONSES = [
+    "bad human",
+    "no u",
+    "you really think so? :blush:?",
+    "thank you! i'll let my owners know how you feel"
+]
+
+BAD_BOT_RESPONSES = [
+    "better than you",
+    "deal with it",
+    "fork it, fix it, pull request me",
+    "remember when I asked for your opinion? me neither.",
+    "you're annoying",
+    "everyone is a bot except for you"
+]
+
+FUCK_YOU_RESPONSES = [
+    "thats not nice :cry:",
+    "what would make you say such a thing???",
+    "i'm telling mom",
+    "come again?"
+]
 
 class Silly(commands.Cog, name="Silly Module"):
     """A collection of silly commands"""
@@ -57,13 +79,13 @@ class Silly(commands.Cog, name="Silly Module"):
             return
 
         if GOOD_BOT_RE.match(message.content):
-            return await message.channel.send("bad human")
+            return await message.channel.send(choice(GOOD_BOT_RESPONSES))
 
         if BAD_BOT_RE.match(message.content):
-            return await message.channel.send("thank you {}!".format(author.mention))
+            return await message.channel.send(choice(BAD_BOT_RESPONSES))
 
         if FUCK_YOU.match(message.content):
-            return await message.channel.send("thats not nice :(")
+            return await message.channel.send(choice(FUCK_YOU_RESPONSES))
 
 
 def setup(bot: commands.Bot):

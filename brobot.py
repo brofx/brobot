@@ -45,9 +45,6 @@ else:
 @brobot.event
 async def on_ready():
     print(f'\n\nLogged in as: {brobot.user.name} - {brobot.user.id}\nVersion: {discord.__version__}\n')
-
-    # Changes our bots Playing Status. type=1(streaming) for a standard game you could remove type and url.
-    # await brobot.change_presence(activity=discord.Game(name='Testing brobot...'))
     print(f'Successfully logged in and booted...!')
 
 

@@ -36,21 +36,15 @@ class ActivityTracker(commands.Cog, name="Activity Module"):
                 embed.add_field(name=PLACING_EMOJIS[index], value=row_text, inline=False)
             return await ctx.send(embed=embed)
 
-            # final_string = "Most mentioned: {}".format(
-            #     ", ".join(["{}: {}".format(ctx.guild.get_member(int(x[0])).display_name, int(x[1])) for x in top_results]))
-
     @commands.command()
     @commands.guild_only()
     async def lines(self, ctx: commands.Context, *, target: str = None):
-        """Displays the most talkative memebers or the number of lines for the user"""
+        """Displays the most talkative members or the number of lines for the user"""
         if target and target == "me":
             result = int(self.redis.zscore(USER_STATS_KEY, ctx.author.id) or 0)
             final_string = "You've said {} line{}".format(result, "s" if result != 1 else "")
             return await ctx.send(final_string)
         else:
-            # results = self.redis.zrevrange(USER_STATS_KEY, 0, 2, withscores=True)
-            # final_string = "Most Lines: {}".format(
-            #     ", ".join(["{}: {}".format(ctx.guild.get_member(int(x[0])).display_name, int(x[1])) for x in results]))
             embed: discord.Embed = discord.Embed(title="Most Talkative Users")
             for index, record in enumerate(self.redis.zrevrange(USER_STATS_KEY, 0, 2, withscores=True)):
                 user_id, count = record

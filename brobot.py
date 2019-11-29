@@ -15,7 +15,8 @@ brobot_modules = [
     "modules.urbandict",
     "modules.choose",
     "modules.split",
-    "modules.8ball"
+    "modules.8ball",
+    "modules.activity"
 ]
 
 

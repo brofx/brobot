@@ -28,7 +28,7 @@ class ActivityTracker(commands.Cog, name="Activity Module"):
         else:
             top_results = self.redis.zrevrange(MENTION_STATS_KEY, 0, 2, withscores=True)
             final_string = "Most mentioned: {}".format(
-                ", ".join(["{}: {}".format(ctx.guild.get_member(int(x[0])).name, int(x[1])) for x in top_results]))
+                ", ".join(["{}: {}".format(ctx.guild.get_member(int(x[0])).display_name, int(x[1])) for x in top_results]))
         return await ctx.send(final_string)
 
     @commands.command()
@@ -41,7 +41,7 @@ class ActivityTracker(commands.Cog, name="Activity Module"):
         else:
             results = self.redis.zrevrange(USER_STATS_KEY, 0, 2, withscores=True)
             final_string = "Most Lines: {}".format(
-                ", ".join(["{}: {}".format(ctx.guild.get_member(int(x[0])).name, int(x[1])) for x in results]))
+                ", ".join(["{}: {}".format(ctx.guild.get_member(int(x[0])).display_name, int(x[1])) for x in results]))
         return await ctx.send(final_string)
 
     @commands.Cog.listener()

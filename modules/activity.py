@@ -10,6 +10,8 @@ HOURLY_STATS_KEY = "HOURLY"
 USER_STATS_KEY = "USER"
 MENTION_STATS_KEY = "MENTION"
 
+PLACING_EMOJIS = [":first_place:", ":second_place:", ":third_place:"]
+
 
 class ActivityTracker(commands.Cog, name="Activity Module"):
     """Tracks most active users, most mentions, and most active times of day"""
@@ -25,11 +27,17 @@ class ActivityTracker(commands.Cog, name="Activity Module"):
         if target and target == "me":
             result = int(self.redis.zscore(MENTION_STATS_KEY, ctx.author.id) or 0)
             final_string = "You've been mentioned {} time{}".format(result, "s" if result != 1 else "")
+            return await ctx.send(final_string)
         else:
-            top_results = self.redis.zrevrange(MENTION_STATS_KEY, 0, 2, withscores=True)
-            final_string = "Most mentioned: {}".format(
-                ", ".join(["{}: {}".format(ctx.guild.get_member(int(x[0])).display_name, int(x[1])) for x in top_results]))
-        return await ctx.send(final_string)
+            embed: discord.Embed = discord.Embed(title="Most Mentioned Users")
+            for index, record in enumerate(self.redis.zrevrange(MENTION_STATS_KEY, 0, 2, withscores=True)):
+                user_id, count = record
+                row_text = "{} - {}".format(ctx.guild.get_member(int(user_id)).display_name, int(count))
+                embed.add_field(name=PLACING_EMOJIS[index], value=row_text, inline=False)
+            return await ctx.send(embed=embed)
+
+            # final_string = "Most mentioned: {}".format(
+            #     ", ".join(["{}: {}".format(ctx.guild.get_member(int(x[0])).display_name, int(x[1])) for x in top_results]))
 
     @commands.command()
     @commands.guild_only()
@@ -38,11 +46,17 @@ class ActivityTracker(commands.Cog, name="Activity Module"):
         if target and target == "me":
             result = int(self.redis.zscore(USER_STATS_KEY, ctx.author.id) or 0)
             final_string = "You've said {} line{}".format(result, "s" if result != 1 else "")
+            return await ctx.send(final_string)
         else:
-            results = self.redis.zrevrange(USER_STATS_KEY, 0, 2, withscores=True)
-            final_string = "Most Lines: {}".format(
-                ", ".join(["{}: {}".format(ctx.guild.get_member(int(x[0])).display_name, int(x[1])) for x in results]))
-        return await ctx.send(final_string)
+            # results = self.redis.zrevrange(USER_STATS_KEY, 0, 2, withscores=True)
+            # final_string = "Most Lines: {}".format(
+            #     ", ".join(["{}: {}".format(ctx.guild.get_member(int(x[0])).display_name, int(x[1])) for x in results]))
+            embed: discord.Embed = discord.Embed(title="Most Talkative Users")
+            for index, record in enumerate(self.redis.zrevrange(USER_STATS_KEY, 0, 2, withscores=True)):
+                user_id, count = record
+                row_text = "{} - {}".format(ctx.guild.get_member(int(user_id)).display_name, int(count))
+                embed.add_field(name=PLACING_EMOJIS[index], value=row_text, inline=False)
+            return await ctx.send(embed=embed)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):

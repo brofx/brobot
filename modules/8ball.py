@@ -2,6 +2,7 @@ import random
 from typing import List
 
 from discord.ext import commands
+import discord
 
 
 class EightBall(commands.Cog, name="Magic 8 Ball"):
@@ -10,7 +11,7 @@ class EightBall(commands.Cog, name="Magic 8 Ball"):
 
     @commands.command(name="8", aliases=["8ball"])
     @commands.guild_only()
-    async def eightball(self, ctx: commands.Context):
+    async def eightball(self, ctx: commands.Context, *, question=None):
         """Calls upon the magic eight ball"""
         messages: List[str] = ["It is certain",
                                "It is decidedly so",
@@ -31,7 +32,10 @@ class EightBall(commands.Cog, name="Magic 8 Ball"):
                                "yes, gods plan",
                                "that's gonna be a no from me dawg",
                                "No, stop asking."]
-        return await ctx.send(random.choice(messages))
+        embed: discord.Embed = discord.Embed(title=question or "Magic 8 Ball")
+        embed.add_field(name="My Decision", value=random.choice(messages), inline=False)
+
+        return await ctx.send(embed=embed)
 
 
 def setup(bot: commands.Bot):

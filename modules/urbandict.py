@@ -1,6 +1,7 @@
 import re
 
 import requests
+import discord
 from discord.ext import commands
 from requests.utils import requote_uri
 
@@ -34,9 +35,10 @@ class UrbanDict(commands.Cog, name="Urban Dictionary Module"):
 
         definition: str = re.sub(r'([\[\]])', '', result['definition'])
 
-        response: str = "**{}**: {}".format(term, definition)
+        response: discord.Embed = discord.Embed(title=term)
+        response.add_field(name="Definition", value=definition, inline=False)
 
-        return await ctx.send(response)
+        return await ctx.send(embed=response)
 
 
 def setup(bot: commands.Bot):

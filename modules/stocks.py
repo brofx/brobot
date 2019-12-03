@@ -1,3 +1,4 @@
+import discord
 import requests
 from discord.ext import commands
 
@@ -20,14 +21,27 @@ class Stocks(commands.Cog, name="Stocks Module"):
             return await ctx.send('Please enter a valid stock symbol')
         name = symbol_lookup(symbol)
         dates = sorted(stock_lookup.json()['Time Series (Daily)'].keys(), reverse=True)
-        start = '{0:.2f}'.format(float(stock_lookup.json()['Time Series (Daily)'][dates[1]]['4. close']))
-        current = '{0:.2f}'.format(float(stock_lookup.json()['Time Series (Daily)'][dates[0]]['4. close']))
-        change = '{0:.2f}'.format(float(current) - float(start))
-        percent = '{0:.2f}'.format((float(change) / float(start)) * 100)
 
-        result = "\n**{}({})**\nOpen: ${}\nNow: ${}\n∆$ {}\n∆% {}".format(name, symbol, start, current, change, percent)
+        start_value: float = float(stock_lookup.json()['Time Series (Daily)'][dates[1]]['4. close'])
+        current_value: float = float(stock_lookup.json()['Time Series (Daily)'][dates[0]]['4. close'])
+        change_dollars: float = current_value - start_value
+        change_pct: float = (change_dollars / start_value) * 100#(1 - (current_value / start_value)) * 100
 
-        return await ctx.send(result)
+        color = 0x000000 if abs(change_pct) < .5 else 0x007d15 if change_dollars > 0 else 0x7d0000
+
+        start = '$ {0:.2f}'.format(start_value)
+        current = '$ {0:.2f}'.format(current_value)
+        change = '$ {0:.2f} / {1:.2f} %'.format(change_dollars, change_pct)
+
+        embed: discord.Embed = discord.Embed(title="{name} ({symbol})".format(
+            name=name,
+            symbol=symbol
+        ), color=color)
+        embed.add_field(name="Open", value=start, inline=False)
+        embed.add_field(name="Now", value=current, inline=False)
+        embed.add_field(name="Change ", value=change, inline=False)
+
+        return await ctx.send(embed=embed)
 
 
 def setup(bot: commands.Bot):

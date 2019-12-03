@@ -25,7 +25,7 @@ class Stocks(commands.Cog, name="Stocks Module"):
         start_value: float = float(stock_lookup.json()['Time Series (Daily)'][dates[1]]['4. close'])
         current_value: float = float(stock_lookup.json()['Time Series (Daily)'][dates[0]]['4. close'])
         change_dollars: float = current_value - start_value
-        change_pct: float = (change_dollars / start_value) * 100#(1 - (current_value / start_value)) * 100
+        change_pct: float = (change_dollars / start_value) * 100
 
         color = 0x000000 if abs(change_pct) < .5 else 0x007d15 if change_dollars > 0 else 0x7d0000
 

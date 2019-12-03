@@ -12,8 +12,8 @@ TODO: Include arguments and syntaxes
 
 All commands are prefixed with `!`. 
 
-- `good bot`
-    - No prefex, if you call the bot good it will reply in a snarky manner.
+- `good bot` / `bad bot`
+    - No prefex, bot will reply in a snarky manner.
 - roll
     - Rolls a number between 0 and 100. Takes optional first and second parameters to either define a max (only when first parameter is present) or a range (when both parameters are present).
 - stocks
@@ -30,7 +30,12 @@ All commands are prefixed with `!`.
     - Will choose an option from the provided options.
 - split
     - Will take all users in the current voice channel and split them among that channel and the channel provided.
-
+- 8ball / 8
+    - Rolls a magic 8 ball. Optional question can be included
+- mentions
+    - Shows the top 3 most mentioned users
+- lines
+    - Shows the top 3 most talkative users
 ### Writing Modules
 
 You can view the existing modules in the modules directory to get an idea of how to write a module.

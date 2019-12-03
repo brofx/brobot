@@ -8,7 +8,7 @@ from discord.ext import commands
 
 GOOD_BOT_RE = re.compile(r'^good bot$', re.IGNORECASE)
 BAD_BOT_RE = re.compile(r'^bad bot$', re.IGNORECASE)
-FUCK_YOU = re.compile(r'^fuck.+(you.*)?brobot.*$', re.IGNORECASE)
+FUCK_YOU = re.compile(r'^fuck.+brobot.*$', re.IGNORECASE)
 
 GOOD_BOT_RESPONSES = [
     "bad human",

@@ -32,8 +32,10 @@ class ActivityTracker(commands.Cog, name="Activity Module"):
             embed: discord.Embed = discord.Embed(title="Most Mentioned Users")
             for index, record in enumerate(self.redis.zrevrange(MENTION_STATS_KEY, 0, 2, withscores=True)):
                 user_id, count = record
-                row_text = "{} - {}".format(ctx.guild.get_member(int(user_id)).display_name, int(count))
-                embed.add_field(name=PLACING_EMOJIS[index], value=row_text, inline=False)
+                row_text = "{}".format(int(count))
+                embed.add_field(
+                    name="{} - {}".format(PLACING_EMOJIS[index], ctx.guild.get_member(int(user_id)).display_name),
+                    value=row_text, inline=False)
             return await ctx.send(embed=embed)
 
     @commands.command()
@@ -48,8 +50,10 @@ class ActivityTracker(commands.Cog, name="Activity Module"):
             embed: discord.Embed = discord.Embed(title="Most Talkative Users")
             for index, record in enumerate(self.redis.zrevrange(USER_STATS_KEY, 0, 2, withscores=True)):
                 user_id, count = record
-                row_text = "{} - {}".format(ctx.guild.get_member(int(user_id)).display_name, int(count))
-                embed.add_field(name=PLACING_EMOJIS[index], value=row_text, inline=False)
+                row_text = "{}".format(int(count))
+                embed.add_field(
+                    name="{} - {}".format(PLACING_EMOJIS[index], ctx.guild.get_member(int(user_id)).display_name),
+                    value=row_text, inline=False)
             return await ctx.send(embed=embed)
 
     @commands.Cog.listener()

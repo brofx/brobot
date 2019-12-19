@@ -3,6 +3,9 @@ import os
 import discord
 from discord.ext import commands
 
+# import logging
+# logging.basicConfig(level=logging.INFO)
+
 discord_key: str = os.getenv("DISCORD_KEY")
 
 brobot_modules = [

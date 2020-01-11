@@ -19,7 +19,8 @@ brobot_modules = [
     "modules.choose",
     "modules.split",
     "modules.8ball",
-    "modules.activity"
+    "modules.activity",
+    "modules.gdq"
 ]
 
 

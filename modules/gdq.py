@@ -18,7 +18,6 @@ class GDQ(commands.Cog, name="GDQ Information"):
     async def gdq(self, ctx: commands.Context, *, question=None):
         """Gets information about the current or next GDQ"""
         embed: discord.Embed = discord.Embed(title="Games Done Quick")
-        # embed.add_field(name="", value=random.choice(messages), inline=False)
 
         gdq_info: List[Tuple[str, str]] = get_gdq_info()
 
@@ -29,6 +28,7 @@ class GDQ(commands.Cog, name="GDQ Information"):
 
         for field_name, data in gdq_info:
             embed.add_field(name=field_name, value=data, inline=False)
+
         return await ctx.send(embed=embed)
 
 
@@ -110,13 +110,13 @@ def get_gdq_info():
     url = 'https://gamesdonequick.com/schedule'
 
     next_gdq_item = ("Next GDQ", textdate)
-    days_delta_item = ("Days Until", delta.days if delta else "?")
+    days_delta_item = ("Days Until", delta.days if delta else "??")
     schedule_url_item = ("Schedule", "https://gamesdonequick.com/schedule")
     twitch_url_item = ("TTV", "http://www.twitch.tv/gamesdonequick")
 
     try:
         x = requests.get(url).content
-        bs = BeautifulSoup(x)
+        bs = BeautifulSoup(x, features="html.parser")
         run = bs.find("table", {"id": "runTable"}).tbody
         gdqstart = datetime.strptime(run.td.getText(), '%Y-%m-%dT%H:%M:%SZ')
         gdqstart = gdqstart.replace(tzinfo=timezone.utc)
@@ -128,7 +128,6 @@ def get_gdq_info():
     if not nextgame:
         return [next_gdq_item + days_delta_item]
     if now < gdqstart:
-        tts = gdqstart - now
         return [next_gdq_item + days_delta_item, schedule_url_item]
 
     if nextgame == 'done':
@@ -136,10 +135,19 @@ def get_gdq_info():
 
     items = [
         ("Current Game", "setup??" if not game else game + ("" if not comment else " ({})".format(comment))),
-        ("Runner", runner),
-        ("ETA", eta),
-        ("Next Game", nextgame),
-        ("Next Runner", nextrunner)
     ]
+
+    if runner:
+        items.append(("Runner", runner))
+
+    if eta:
+        items.append(("ETA", eta))
+
+    if nextgame:
+        items.append(("Next Game", nextgame))
+
+    if nextrunner:
+        items.append(("Next Runner", nextrunner))
+
 
     return items + [twitch_url_item, schedule_url_item]

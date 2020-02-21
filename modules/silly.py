@@ -44,6 +44,18 @@ class Silly(commands.Cog, name="Silly Module"):
     async def mock(self, ctx: commands.Context, *, text: str):
         """Returns the given text in a mocking tone."""
         return await ctx.send("".join([choice([x.upper(), x.lower()]) for x in text]))
+    
+    @commands.command()
+    @commands.guild_only()
+    async def lenny(self, ctx: commands.Context):
+        """Returns the lenny face"""
+        return await ctx.send("( ͡° ͜ʖ ͡°)")
+    
+    @commands.command()
+    @commands.guild_only()
+    async def benny(self, ctx: commands.Context):
+        """Returns the benny face"""
+        return await ctx.send("(ง ͠° ͟ل͜ ͡°)ง")
 
     @commands.command()
     @commands.guild_only()

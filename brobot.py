@@ -20,7 +20,8 @@ brobot_modules = [
     "modules.split",
     "modules.8ball",
     "modules.activity",
-    "modules.gdq"
+    "modules.gdq",
+    "modules.egs",
 ]
 
 

@@ -12,18 +12,17 @@ class Stocks(commands.Cog, name="Stocks Module"):
     @commands.guild_only()
     async def stocks(self, ctx: commands.Context, symbol: str = None):
         """Returns the curent stock information for a given stock or defaults to DJI if no stock is provided."""
-        symbol = "DJI" if not symbol else symbol.upper()
+        symbol = "^DJI" if not symbol else symbol.upper()
         stock_lookup = requests.get(
-            "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={}&interval=1min&apikey={}".format(
+            "https://finnhub.io/api/v1/quote?symbol={}&token={}".format(
                 symbol, self.key))
 
         if stock_lookup.json().get('Error Message'):
             return await ctx.send('Please enter a valid stock symbol')
         name = symbol_lookup(symbol)
-        dates = sorted(stock_lookup.json()['Time Series (Daily)'].keys(), reverse=True)
 
-        start_value: float = float(stock_lookup.json()['Time Series (Daily)'][dates[1]]['4. close'])
-        current_value: float = float(stock_lookup.json()['Time Series (Daily)'][dates[0]]['4. close'])
+        start_value: float = float(stock_lookup.json()['o'])
+        current_value: float = float(stock_lookup.json()['c'])
         change_dollars: float = current_value - start_value
         change_pct: float = (change_dollars / start_value) * 100
 

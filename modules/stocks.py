@@ -1,12 +1,13 @@
 import discord
 import requests
+import os
 from discord.ext import commands
 
 
 class Stocks(commands.Cog, name="Stocks Module"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.key = "APIKEYGOESHERELOL"  # os.getenv("ALPHAVANTAGE_KEY")
+        self.key = os.getenv("FINNHUB_KEY")
 
     @commands.command()
     @commands.guild_only()

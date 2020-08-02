@@ -23,7 +23,8 @@ brobot_modules = [
     "modules.gdq",
     "modules.egs",
     "modules.kym",
-    "modules.hltb"
+    "modules.hltb",
+    "modules.game_tag"
 ]
 
 

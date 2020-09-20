@@ -31,7 +31,6 @@ class GameTag(commands.Cog, name="Game Tag"):
 
     @commands.command(name="joingroup")
     @commands.guild_only()
-    @commands.has_any_role("Member")
     async def join_group(self, ctx: commands.Context, *, group: str = None):
         """Adds the user to the specified group if it exists"""
         if not group:
@@ -50,7 +49,7 @@ class GameTag(commands.Cog, name="Game Tag"):
             return await ctx.send("You can't join that group.")
 
         await member.add_roles(role_result, atomic=True)
-        return await ctx.send("You've will now be notified when `@{}` is tagged.".format(role_result.name))
+        return await ctx.send("You will now be notified when `@{}` is tagged.".format(role_result.name))
 
     @commands.command(name="leavegroup")
     @commands.guild_only()

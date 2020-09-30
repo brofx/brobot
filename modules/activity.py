@@ -86,7 +86,7 @@ class ActivityTracker(commands.Cog, name="Activity Module"):
         author: discord.Member = message.author
 
         # Ignore commands or bot messages
-        if author.bot or message.content.startswith("!"):
+        if author.bot or message.content.startswith("!") or not isinstance(message.channel, discord.TextChannel):
             return
 
         now: datetime = datetime.now()

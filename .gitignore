@@ -1,8 +1,10 @@
-venv/
-env/
+.DS_Store
 .env/
-.vscode/
-env.sh
-brobot.env
+.envrc
 .idea/
+.vscode/
 __pycache__/
+brobot.env
+env.sh
+env/
+venv/

@@ -24,7 +24,8 @@ brobot_modules = [
     "modules.egs",
     "modules.kym",
     "modules.hltb",
-    "modules.game_tag"
+    "modules.game_tag",
+    "modules.backstreet_boys"
 ]
 
 

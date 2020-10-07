@@ -39,7 +39,14 @@ def init_bot(bot: commands.Bot):
     return bot
 
 
-brobot = commands.Bot(command_prefix="!", description='Brobot')
+intents = discord.Intents.default()
+intents.guilds = True
+intents.members = True
+intents.emojis = True
+intents.voice_states = True
+intents.guild_messages = True
+
+brobot = commands.Bot(command_prefix="!", description='Brobot', intents=intents)
 
 if __name__ == '__main__':
     if not discord_key:

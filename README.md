@@ -38,6 +38,8 @@ All commands are prefixed with `!`.
     - Shows the top 3 most talkative users
 - seen
     - Shows the last message the user said in the main channel
+- nubeer
+    - Shows stats for nubeer
 ### Writing Modules
 
 You can view the existing modules in the modules directory to get an idea of how to write a module.

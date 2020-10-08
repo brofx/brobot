@@ -66,7 +66,7 @@ class Silly(commands.Cog, name="Silly Module"):
         delta: timedelta = expanse_date - today
         hours, remainder = divmod(delta.seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
-        output: str = "{days} days, {hours} hours, {minutes} minutes, and {seconds} seconds until S4 of The Expanse!".format(
+        output: str = "{days} days, {hours} hours, {minutes} minutes, and {seconds} seconds until S5 of The Expanse!".format(
             days=delta.days, hours=hours, minutes=minutes, seconds=seconds)
 
         return await ctx.send(output)

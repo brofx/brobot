@@ -25,7 +25,8 @@ brobot_modules = [
     "modules.kym",
     "modules.hltb",
     "modules.game_tag",
-    "modules.backstreet_boys"
+    "modules.backstreet_boys",
+    "modules.nubeer",
 ]
 
 

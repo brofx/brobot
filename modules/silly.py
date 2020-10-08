@@ -62,7 +62,7 @@ class Silly(commands.Cog, name="Silly Module"):
     async def expanse(self, ctx: commands.Context):
         """Provides a countdown to when Season 4 of The Expanse releases."""
         today: datetime = datetime.now()
-        expanse_date: datetime = datetime(2019, 12, 16, 18, 00, 0)
+        expanse_date: datetime = datetime(2020, 12, 16, 18, 00, 0)
         delta: timedelta = expanse_date - today
         hours, remainder = divmod(delta.seconds, 3600)
         minutes, seconds = divmod(remainder, 60)

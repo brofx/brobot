@@ -27,7 +27,7 @@ def get_response():
     query = {"q" : "{querystring}" }
     headers = {
         'x-rapidapi-host': "imdb8.p.rapidapi.com",
-        'x-rapidapi-key': "c582e6e4d4mshe770e817c060160p189010jsnabcaea7f1200"
+        'x-rapidapi-key': "{self.key}"
         }
     api_response = requests.get(url, headers=headers, params=format(query))
     if api_response.ok:

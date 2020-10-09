@@ -33,6 +33,7 @@ FUCK_YOU_RESPONSES = [
     "come again?"
 ]
 
+
 class Silly(commands.Cog, name="Silly Module"):
     """A collection of silly commands"""
 
@@ -43,14 +44,18 @@ class Silly(commands.Cog, name="Silly Module"):
     @commands.guild_only()
     async def mock(self, ctx: commands.Context, *, text: str):
         """Returns the given text in a mocking tone."""
-        return await ctx.send("".join([choice([x.upper(), x.lower()]) for x in text]))
-    
+        result: str = "".join([choice([x.upper(), x.lower()]) for x in text])
+        embed: discord.Embed = discord.Embed(title="") \
+            .set_thumbnail(url="https://i.sc0tt.net/files/NBNso.png") \
+            .add_field(name="​", value=result)
+        return await ctx.send(embed=embed)
+
     @commands.command()
     @commands.guild_only()
     async def lenny(self, ctx: commands.Context):
         """Returns the lenny face"""
         return await ctx.send("( ͡° ͜ʖ ͡°)")
-    
+
     @commands.command()
     @commands.guild_only()
     async def benny(self, ctx: commands.Context):

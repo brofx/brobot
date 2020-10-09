@@ -27,6 +27,7 @@ brobot_modules = [
     "modules.game_tag",
     "modules.backstreet_boys",
     "modules.nubeer",
+    "modules.imdb",
 ]
 
 

@@ -1,16 +1,18 @@
 from discord.ext import commands
 import discord
 import requests
+import os
 
 url = "https://imdb8.p.rapidapi.com/title/auto-complete"
 
 class IMDB(commands.Cog, name="IMDB"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.key = os.getenv("IMDB_KEY")
 
     @commands.command()
     @commands.guild_only()
-    async def nubeer(self, ctx: commands.Context, *, querystring=None):
+    async def imdb(self, ctx: commands.Context, *, querystring=None):
         """Displays IMDB"""      
 
         if not querystring:
@@ -27,7 +29,7 @@ def get_response():
         'x-rapidapi-host': "imdb8.p.rapidapi.com",
         'x-rapidapi-key': "c582e6e4d4mshe770e817c060160p189010jsnabcaea7f1200"
         }
-    api_response = requests.request("GET", url, headers=headers, params=format(query))
+    api_response = requests.get(url, headers=headers, params=format(query))
     if api_response.ok:
         response: dict = api_response.json()["data"]
         if response is not None: 

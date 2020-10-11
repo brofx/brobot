@@ -18,16 +18,16 @@ class IMDB(commands.Cog, name="IMDB"):
         if not querystring:
             return await ctx.send("Error, usage: !imdb <title>")
 
-        embed = get_response()  
+        embed = get_response(self, querystring)  
         if embed is None:
             return await ctx.send("Unable to find it! If this issue persists, contact @h3r0_sH0t#0027")
         return await ctx.send(embed=embed)
 
-def get_response():
-    query = {"q" : "{querystring}" }
+def get_response(self, querystring):
+    query = {"q" : querystring }
     headers = {
         'x-rapidapi-host': "imdb8.p.rapidapi.com",
-        'x-rapidapi-key': "{self.key}"
+        'x-rapidapi-key': self.key
         }
     api_response = requests.get(url, headers=headers, params=format(query))
     if api_response.ok:

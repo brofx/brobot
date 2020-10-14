@@ -8,3 +8,4 @@ brobot.env
 env.sh
 env/
 venv/
+env

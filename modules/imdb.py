@@ -35,7 +35,7 @@ def get_response(self, querystring):
     api_response = requests.get(url, headers=headers, params=query)
     if api_response.ok:
         response: dict = api_response.json()
-        if response is not None:
+        if response and "d" in response:
             title = response["d"][0]["l"]
             type_film = response["d"][0]["q"]
             imdb_id = response["d"][0]["id"]

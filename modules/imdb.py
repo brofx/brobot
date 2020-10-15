@@ -1,9 +1,11 @@
-from discord.ext import commands
-import discord
-import requests
 import os
 
+import discord
+import requests
+from discord.ext import commands
+
 url = "https://imdb8.p.rapidapi.com/title/auto-complete"
+
 
 class IMDB(commands.Cog, name="IMDB"):
     def __init__(self, bot: commands.Bot):
@@ -13,26 +15,27 @@ class IMDB(commands.Cog, name="IMDB"):
     @commands.command()
     @commands.guild_only()
     async def imdb(self, ctx: commands.Context, *, querystring=None):
-        """Displays IMDB"""      
+        """Displays IMDB"""
 
         if not querystring:
             return await ctx.send("Error, usage: !imdb <title>")
 
-        embed = get_response(self, querystring)  
+        embed = get_response(self, querystring)
         if embed is None:
             return await ctx.send("Unable to find it! If this issue persists, contact @h3r0_sH0t#0027")
         return await ctx.send(embed=embed)
 
+
 def get_response(self, querystring):
-    query = {"q" : querystring }
+    query = {"q": querystring}
     headers = {
         'x-rapidapi-host': "imdb8.p.rapidapi.com",
         'x-rapidapi-key': self.key
-        }
-    api_response = requests.get(url, headers=headers, params=format(query))
+    }
+    api_response = requests.get(url, headers=headers, params=query)
     if api_response.ok:
-        response: dict = api_response.json()["data"]
-        if response is not None: 
+        response: dict = api_response.json()
+        if response is not None:
             title = response["d"][0]["l"]
             type_film = response["d"][0]["q"]
             imdb_id = response["d"][0]["id"]
@@ -47,6 +50,7 @@ def get_response(self, querystring):
             return embed
 
     return None
+
 
 def setup(bot: commands.Bot):
     bot.add_cog(IMDB(bot))

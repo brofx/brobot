@@ -9,26 +9,26 @@ from discord.ext import commands
 discord_key: str = os.getenv("DISCORD_KEY")
 
 brobot_modules = [
-    "modules.base",
-    "modules.name_colors",
-    "modules.roll",
-    "modules.stocks",
-    "modules.silly",
-    "modules.f1",
-    "modules.urbandict",
-    "modules.choose",
-    "modules.split",
     "modules.8ball",
     "modules.activity",
-    "modules.gdq",
-    "modules.egs",
-    "modules.kym",
-    "modules.hltb",
-    "modules.game_tag",
     "modules.backstreet_boys",
-    "modules.nubeer",
+    "modules.base",
+    "modules.choose",
+    "modules.egs",
+    "modules.f1",
+    "modules.game_tag",
+    "modules.gdq",
+    "modules.hltb",
     "modules.imdb",
-]
+    "modules.kym",
+    "modules.name_colors",
+    "modules.nubeer",
+    "modules.poll",
+    "modules.roll",
+    "modules.silly",
+    "modules.split",
+    "modules.stocks",
+    "modules.urbandict"]
 
 
 def init_bot(bot: commands.Bot):

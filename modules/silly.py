@@ -80,9 +80,17 @@ class Silly(commands.Cog, name="Silly Module"):
     @commands.guild_only()
     async def rather(self, ctx: commands.Context):
         """Gets a random 'Would You Rather' question from reddit."""
-        # TODO: Store this header somewhere and actually adjust version
         header: dict = {"User-Agent": "BroBot/1.0 by github.com/brofx"}
         question_request = requests.get("http://www.reddit.com/r/wouldyourather.json?limit=100", headers=header).json()
+        question: str = choice(question_request["data"]["children"])["data"]["title"]
+        return await ctx.send(question)
+
+    @commands.command()
+    @commands.guild_only()
+    async def ask(self, ctx: commands.Context):
+        """Gets a random 'Ask Reddit' question from reddit."""
+        header: dict = {"User-Agent": "BroBot/1.0 by github.com/brofx"}
+        question_request = requests.get("http://www.reddit.com/r/askreddit.json?limit=100", headers=header).json()
         question: str = choice(question_request["data"]["children"])["data"]["title"]
         return await ctx.send(question)
 

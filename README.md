@@ -46,3 +46,16 @@ You can view the existing modules in the modules directory to get an idea of how
 
 Once you have your module, you can edit `brobot.py` and add it to the list of modules.
 
+### Local Development
+
+Build
+
+```sh
+docker build . --tag brobot:latest
+```
+
+Run
+
+```sh 
+docker run brobot:latest --name=brobot -e DISCORD_KEY=${DISCORD_KEY}
+```

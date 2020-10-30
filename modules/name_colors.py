@@ -4,9 +4,9 @@ from typing import List
 import discord
 from discord.ext import commands
 
-VALID_COLORS: List[str] = ["green", "purple", "red", "blue", "yellow", "orange", "white", "pink"]
+VALID_COLORS: List[str] = ["green", "purple", "red", "blue", "yellow", "orange", "white", "pink", "cyan"]
 COLOR_ROLES: List[str] = ["Team Green", "Team Purple", "Team Red", "Team Blue", "Team Yellow", "Team Orange",
-                          "Team White", "Team Pink"]
+                          "Team White", "Team Pink", "color-cyan"]
 
 
 class NameColors(commands.Cog, name="Name Colors"):

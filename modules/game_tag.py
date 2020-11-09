@@ -61,7 +61,8 @@ class GameTag(commands.Cog, name="Game Tag"):
 
         role_result: Role = discord.utils.find(
             lambda role: role.name.replace("^", "").lower() == group.replace("^", "").lower(), ctx.guild.roles)
-        if role_result:
+
+        if not role_result:
             return await ctx.send("That group doesn't exist.")
 
         member: discord.Member = ctx.author

@@ -3,8 +3,8 @@ import os
 import discord
 from discord.ext import commands
 
-# import logging
-# logging.basicConfig(level=logging.INFO)
+#import logging
+#logging.basicConfig(level=logging.INFO)
 
 discord_key: str = os.getenv("DISCORD_KEY")
 
@@ -28,7 +28,8 @@ brobot_modules = [
     "modules.silly",
     "modules.split",
     "modules.stocks",
-    "modules.urbandict"]
+    "modules.urbandict",
+    "modules.upscoot"]
 
 
 def init_bot(bot: commands.Bot):

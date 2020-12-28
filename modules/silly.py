@@ -58,6 +58,13 @@ class Silly(commands.Cog, name="Silly Module"):
 
     @commands.command()
     @commands.guild_only()
+    async def followage(self, ctx: commands.Context):
+        """Shows the join date"""
+        join_date: datetime = ctx.author.joined_at
+        return await ctx.send("{} you joined the server on {}".format(ctx.author.mention, join_date.strftime("%Y-%m-%d at %I:%M %p")))
+
+    @commands.command()
+    @commands.guild_only()
     async def benny(self, ctx: commands.Context):
         """Returns the benny face"""
         return await ctx.send("(ง ͠° ͟ل͜ ͡°)ง")

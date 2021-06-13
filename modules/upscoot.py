@@ -24,7 +24,7 @@ class Upscoot(commands.Cog, name="Upscoot"):
         await self.bot.wait_until_ready()
         channel = self.bot.get_channel(789152518202064916)
         pubsub = self.redis.pubsub(ignore_subscribe_messages=True)
-        pubsub.subscribe("upscoot")
+        pubsub.subscribe("upscoot_discord")
         #print("Ready!, closed: {}, subscribed: {}".format(self.bot.is_closed(), self.pubsub.subscribed))
         while not self.bot.is_closed() and pubsub.subscribed:
             #print("Getting message")

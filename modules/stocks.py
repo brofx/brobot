@@ -16,8 +16,8 @@ class Stocks(commands.Cog, name="Stocks Module"):
     async def stocks(self, ctx: commands.Context, entered_symbol: str = None):
         """Returns the curent stock information for a given stock or defaults to DJI if no stock is provided."""
 
-        name, symbol = symbol_lookup(entered_symbol)
         entered_symbol = "SPY" if not entered_symbol else entered_symbol.upper()
+        name, symbol = symbol_lookup(entered_symbol)
 
         if not name:
             return await ctx.send("Not found")

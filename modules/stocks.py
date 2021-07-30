@@ -1,6 +1,8 @@
+import os
+from typing import Optional, Tuple
+
 import discord
 import requests
-import os
 from discord.ext import commands
 
 
@@ -11,16 +13,21 @@ class Stocks(commands.Cog, name="Stocks Module"):
 
     @commands.command()
     @commands.guild_only()
-    async def stocks(self, ctx: commands.Context, symbol: str = None):
+    async def stocks(self, ctx: commands.Context, entered_symbol: str = None):
         """Returns the curent stock information for a given stock or defaults to DJI if no stock is provided."""
-        symbol = "^DJI" if not symbol else symbol.upper()
+
+        name, symbol = symbol_lookup(entered_symbol)
+        entered_symbol = "SPY" if not entered_symbol else entered_symbol.upper()
+
+        if not name:
+            return await ctx.send("Not found")
+
         stock_lookup = requests.get(
             "https://finnhub.io/api/v1/quote?symbol={}&token={}".format(
-                symbol, self.key))
+                entered_symbol, self.key))
 
         if stock_lookup.json().get('Error Message'):
             return await ctx.send('Please enter a valid stock symbol')
-        name = symbol_lookup(symbol)
 
         start_value: float = float(stock_lookup.json()['o'])
         current_value: float = float(stock_lookup.json()['c'])
@@ -48,6 +55,10 @@ def setup(bot: commands.Bot):
     bot.add_cog(Stocks(bot))
 
 
-def symbol_lookup(sybol: str) -> str:
-    s = requests.get("http://d.yimg.com/aq/autoc?query={}&region=US&lang=en-US".format(sybol)).json()
-    return s['ResultSet']['Result'][0]['name']
+def symbol_lookup(symb: str) -> Tuple[Optional[str], Optional[str]]:
+    s = requests.get(
+        "https://query2.finance.yahoo.com/v1/finance/search?q={}&lang=en-US&region=US&quotesCount=3&newsCount=0".format(
+            symb), headers={'User-Agent': 'brobot/discord.bot'}).json()
+    if not s['quotes']:
+        return None, None
+    return (s['quotes'][0].get('shortname') or s['quotes'][0]['longname']), s['quotes'][0]['symbol']

@@ -120,5 +120,5 @@ class Silly(commands.Cog, name="Silly Module"):
             return await message.channel.send(choice(FUCK_YOU_RESPONSES))
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(Silly(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Silly(bot))

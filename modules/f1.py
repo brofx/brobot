@@ -19,8 +19,8 @@ class F1(commands.Cog, name="Formula1 Module"):
         return await ctx.send(embed=next_race)
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(F1(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(F1(bot))
 
 
 def get_next_race():

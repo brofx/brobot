@@ -73,5 +73,5 @@ class NameColors(commands.Cog, name="Name Colors"):
             [m.display_name for m in no_team_members])))
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(NameColors(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(NameColors(bot))

@@ -42,5 +42,5 @@ def get_nubeer_stats():
 
     return None
 
-def setup(bot: commands.Bot):
-    bot.add_cog(Nubeer(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Nubeer(bot))

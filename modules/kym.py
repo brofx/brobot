@@ -53,5 +53,5 @@ def kym(query):
     return title, about, uri
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(KYM(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(KYM(bot))

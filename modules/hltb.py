@@ -56,5 +56,5 @@ def hltb(game: str, result_count: int):
     return all_results
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(HLTB(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(HLTB(bot))

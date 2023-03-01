@@ -51,5 +51,5 @@ class SplitModule(commands.Cog, name="Split Module"):
             await member.move_to(second_voice_chanel)
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(SplitModule(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(SplitModule(bot))

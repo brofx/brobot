@@ -52,5 +52,5 @@ def get_response(self, querystring):
     return None
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(IMDB(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(IMDB(bot))

@@ -41,5 +41,5 @@ class UrbanDict(commands.Cog, name="Urban Dictionary Module"):
         return await ctx.send(embed=response)
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(UrbanDict(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(UrbanDict(bot))

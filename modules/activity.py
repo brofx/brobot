@@ -108,5 +108,5 @@ class ActivityTracker(commands.Cog, name="Activity Module"):
             self.redis.hset(SEEN_KEY, author.id, result)
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(ActivityTracker(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(ActivityTracker(bot))

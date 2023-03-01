@@ -19,5 +19,5 @@ class BaseModule(commands.Cog, name="Base Module"):
     #        return await message.channel.send("Got a message: " + message.content)
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(BaseModule(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(BaseModule(bot))

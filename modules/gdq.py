@@ -32,8 +32,8 @@ class GDQ(commands.Cog, name="GDQ Information"):
         return await ctx.send(embed=embed)
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(GDQ(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(GDQ(bot))
 
 
 def GDQdatetime():

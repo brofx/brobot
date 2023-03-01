@@ -35,5 +35,5 @@ class Upscoot(commands.Cog, name="Upscoot"):
                 await asyncio.sleep(1)
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(Upscoot(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Upscoot(bot))

@@ -14,7 +14,7 @@ BACKSTREET_BOYS_OPUS_PATH = (
 )
 
 
-class BackstreetBoys(commands.Cog, name="Choose Module"):
+class BackstreetBoys(commands.Cog, name="Backstreet"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
@@ -107,5 +107,5 @@ def after_disconnect_voice_client(vc: discord.VoiceClient, *, loop=None):
     return _wrapper
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(BackstreetBoys(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(BackstreetBoys(bot))

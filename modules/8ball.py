@@ -38,5 +38,5 @@ class EightBall(commands.Cog, name="Magic 8 Ball"):
         return await ctx.send(embed=embed)
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(EightBall(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(EightBall(bot))

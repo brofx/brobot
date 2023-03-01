@@ -72,5 +72,5 @@ class GameTag(commands.Cog, name="Game Tag"):
             return await ctx.send("You have been removed from `@{}`.".format(role_result.name))
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(GameTag(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(GameTag(bot))

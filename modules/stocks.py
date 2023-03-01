@@ -51,8 +51,8 @@ class Stocks(commands.Cog, name="Stocks Module"):
         return await ctx.send(embed=embed)
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(Stocks(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Stocks(bot))
 
 
 def symbol_lookup(symb: str) -> Tuple[Optional[str], Optional[str]]:

@@ -20,5 +20,5 @@ class Choose(commands.Cog, name="Choose Module"):
         await ctx.send(random.choice(formatted_choices))
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(Choose(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Choose(bot))

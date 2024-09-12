@@ -5,13 +5,18 @@ on:
       - master
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     steps:
     - uses: actions/checkout@master
+      with:
+        fetch-depth: '20'
     - name: Bump version and push tag
-      uses: anothrNick/github-tag-action@1.7.1
+      uses: anothrNick/github-tag-action@1.70.0
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        WITH_V: false
       id: bump_version
     - name: Build and publish Docker Image
       run: |

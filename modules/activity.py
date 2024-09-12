@@ -6,9 +6,11 @@ import pendulum
 import calendar
 from datetime import datetime
 from discord.ext import commands
+import os
 
 # TODO Make These configurable
-REDIS_CONFIG = {"host": "localhost", "port": 6379, "db": 6}
+r_host = os.getenv('REDIS_HOST')
+REDIS_CONFIG = {"host": r_host, "port": 6379, "db": 6}
 HOURLY_STATS_KEY = "HOURLY"
 USER_STATS_KEY = "USER"
 MENTION_STATS_KEY = "MENTION"

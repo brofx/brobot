@@ -47,6 +47,7 @@ MEGA_SPINS_PER_DAY = 3
 MEGA_MIN_POINTS = 1000
 MEGA_COST_FRACTION = 0.10
 MEGA_PAYOUT_MULT = 3.0  # global multiplier applied to the spin total when using MEGA
+JACKPOT_MIN_MATCHES = 20
 
 # Redis keys
 K_MESSAGE_ID = "slots:message_id"
@@ -56,6 +57,7 @@ K_BIGWINS = "slots:bigwins"                # list of JSON entries (newest left)
 K_CONFIG_DATE = "slots:last_config_date"   # date we last loaded config for (NY day)
 K_STATS_SPINS = "slots:stats:spins"        # hash user_id -> total spins (all-time)
 K_STATS_WINNINGS = "slots:stats:winnings"  # hash user_id -> total winnings (all-time)
+K_JACKPOT_POOL = "slots:jackpot:pool"
 
 # Optional: track mega spins separately
 K_STATS_SPINS_MEGA = "slots:stats:spins_mega"      # hash user_id -> total mega spins
@@ -227,32 +229,32 @@ class SlotsCog(commands.Cog):
             deleted += 1
         await ctx.reply(f"Reset today's spin counters. Cleared **{deleted}** entries.", mention_author=False)
 
-    @commands.command(name="slots_hard_reset", help="Hard reset: clears ALL plays (all dates), leaderboard, total spins, total winnings, and big-wins feed. (manage_guild)")
+    @commands.command(name="slots_hard_reset", help="Hard reset: clears ALL plays, leaderboard, total spins, total winnings, big-wins feed, and jackpot. (manage_guild)")
     @commands.has_guild_permissions(manage_guild=True)
     @commands.guild_only()
     async def slots_hard_reset(self, ctx: commands.Context):
-        # Delete all per-day spin counters across all dates
         deleted_plays = 0
         async for key in self.r.scan_iter(match="slots:plays:*"):
             deleted_plays += await self.r.delete(key)
+        async for key in self.r.scan_iter(match="slots:megaplays:*"):
+            deleted_plays += await self.r.delete(key)
 
-        # Delete global stats/feeds
         del_other = await self.r.delete(
-            K_LEADERBOARD,   # zset of total winnings
-            K_STATS_SPINS,   # hash user_id -> total spins
-            K_STATS_WINNINGS,# hash user_id -> total winnings
-            K_BIGWINS        # list of recent big wins
+            K_LEADERBOARD,
+            K_STATS_SPINS,
+            K_STATS_SPINS_MEGA,
+            K_STATS_WINNINGS,
+            K_BIGWINS,
+            K_JACKPOT_POOL
         )
 
-        # Refresh the persistent message (if present) so it reflects the cleared state
         try:
             await self._refresh_channel_message()
         except Exception:
             pass
 
         await ctx.reply(
-            f"**Hard reset complete.** Cleared `{deleted_plays}` daily-play keys and `{del_other}` global data keys "
-            "(leaderboard, total spins, total winnings, big-wins).",
+            f"**Hard reset complete.** Cleared `{deleted_plays}` per-day keys and `{del_other}` global keys (incl. jackpot).",
             mention_author=False
         )
 
@@ -303,44 +305,66 @@ class SlotsCog(commands.Cog):
                     f"MEGA spins require **> {MEGA_MIN_POINTS:,}** points. You currently have **{total_points:,}**.",
                     ephemeral=True
                 )
-
             cost = max(1, int(total_points * MEGA_COST_FRACTION))
 
-            # Deduct cost up-front (incorporated into net result)
-            await self.r.hincrby(K_STATS_WINNINGS, user_id, -cost)
-            await self.r.zincrby(K_LEADERBOARD, -cost, user_id)
+            # Deduct cost up-front and add to the progressive jackpot
+            pipe = self.r.pipeline()
+            pipe.hincrby(K_STATS_WINNINGS, user_id, -cost)
+            pipe.zincrby(K_LEADERBOARD, -cost, user_id)
+            pipe.incrby(K_JACKPOT_POOL, cost)
+            await pipe.execute()
 
             # Record today's MEGA usage
+            mkey = mega_plays_key(int(user_id), date_str)
             await self.r.incr(mkey)
-            await self.r.expire(mkey, 60 * 60 * 48)  # expire after 48h to avoid clutter
+            await self.r.expire(mkey, 60 * 60 * 48)
+
 
         # Perform spin
         bonus_mult = MEGA_PAYOUT_MULT if mega else 1.0
         grid, base_total, breakdown, mult_used = self._spin_and_score(cfg, bonus_multiplier=bonus_mult)
 
-        # Compute net (mega includes cost already deducted from storage; but we present net)
-        gross_win = base_total
-        net_delta = gross_win
-        if mega:
-            net_delta = gross_win - cost  # since cost already deducted from storage
+        # --- Progressive Jackpot check (applies to ALL spins) ---
+        jackpot_award = 0
+        jp = self._jackpot_trigger(grid, cfg)
+        if jp:
+            # Atomically fetch and clear the jackpot pool
+            async with self.r.pipeline(transaction=True) as p:
+                p.get(K_JACKPOT_POOL)
+                p.set(K_JACKPOT_POOL, 0)
+                res = await p.execute()
+            try:
+                jackpot_award = int(res[0] or 0)
+            except Exception:
+                jackpot_award = 0
 
-        # Update stats
+            if jackpot_award > 0:
+                _, eff, token = jp
+                breakdown.append(f"💰 **JACKPOT!** {token} reached {eff} (incl. wilds) → +{jackpot_award:,}")
+
+        # Gross result of the spin (does NOT subtract MEGA cost here)
+        gross_total = base_total + jackpot_award
+
+        # Update stats (cost already deducted above for MEGA, so we add gross_total only)
         await self.r.hincrby(K_STATS_SPINS, user_id, 1)
         if mega:
             await self.r.hincrby(K_STATS_SPINS_MEGA, user_id, 1)
+        if gross_total:
+            await self.r.hincrby(K_STATS_WINNINGS, user_id, gross_total)
+            await self.r.zincrby(K_LEADERBOARD, gross_total, user_id)
 
-        if net_delta != 0:
-            await self.r.hincrby(K_STATS_WINNINGS, user_id, net_delta)
-            await self.r.zincrby(K_LEADERBOARD, net_delta, user_id)
+        # Net change for display
+        net_delta = gross_total - (cost if mega else 0)
 
-        # Big win feed uses gross result (or net? choose net to reflect true gain)
-        if net_delta >= cfg.big_win_threshold:
+        # Big-wins feed uses net
+        if net_delta >= cfg.big_win_threshold or jackpot_award > 0:
             entry = {
-                "user_id": user.id,
-                "username": getattr(user, "global_name", None) or user.name,
+                "user_id": int(user_id),
+                "username": getattr(interaction.user, "global_name", None) or interaction.user.name,
                 "amount": net_delta,
                 "date": date_str,
-                "mega": mega
+                "mega": mega,
+                "jackpot": jackpot_award
             }
             await self.r.lpush(K_BIGWINS, json.dumps(entry))
             await self.r.ltrim(K_BIGWINS, 0, BIGWINS_FEED_LEN - 1)
@@ -389,6 +413,8 @@ class SlotsCog(commands.Cog):
             color=discord.Color.orange() if mega else (discord.Color.green() if net_delta > 0 else discord.Color.dark_gray())
         )
         embed.add_field(name="Grid", value=grid_str, inline=False)
+        if jackpot_award > 0:
+            desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:,}")
 
         if interaction.response.is_done():
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -396,6 +422,39 @@ class SlotsCog(commands.Cog):
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # ---------------- Core logic ----------------
+
+    def _jackpot_trigger(self, grid: List[List[Item]], cfg: SlotsConfig) -> Optional[Tuple[str, int, str]]:
+        """
+        Returns (symbol_key, effective_count_including_wilds, display_token) if any non-multiplier symbol
+        reaches JACKPOT_MIN_MATCHES across the entire 5x5 board when counting wilds as that symbol.
+        Otherwise returns None.
+        """
+        # Count across entire board
+        wild_count = sum(1 for row in grid for it in row if getattr(it, "is_wild", False))
+        counts: Dict[str, int] = {}
+        for row in grid:
+            for it in row:
+                if it.is_multiplier or it.is_wild:
+                    continue
+                counts[it.key] = counts.get(it.key, 0) + 1
+
+        # Choose the best candidate: highest effective count, break ties by base_value
+        best: Optional[Tuple[str, int, int, str]] = None  # (key, eff, base_value, token)
+        for k, base_cnt in counts.items():
+            eff = base_cnt + wild_count
+            if eff >= JACKPOT_MIN_MATCHES:
+                ref = next((x for x in cfg.items if x.key == k), None)
+                if not ref:
+                    continue
+                base_val = ref.base_value
+                token = ref.token() if hasattr(ref, "token") else (ref.emoji if hasattr(ref, "emoji") else k)
+                if best is None or eff > best[1] or (eff == best[1] and base_val > best[2]):
+                    best = (k, eff, base_val, token)
+
+        if best:
+            k, eff, _, token = best
+            return (k, eff, token)
+        return None
 
     def _render_grid(self, grid: List[List[Item]]) -> str:
         return "\n".join(" ".join(cell.token() for cell in row) for row in grid)
@@ -514,11 +573,13 @@ class SlotsCog(commands.Cog):
             feed_lines.append("_No big wins yet._")
 
         last_cfg_date = await self.r.get(K_CONFIG_DATE)
+        pool_val = int(await self.r.get(K_JACKPOT_POOL) or 0)
         embed = discord.Embed(
-            title=f"{cfg.title}",
+            title=f"{cfg.title} — Daily limit: {MEGA_SPINS_PER_DAY} MEGA spins/user",
             description=cfg.instructions,
             color=discord.Color.gold()
         )
+        embed.add_field(name="Progressive Jackpot", value=f"**{pool_val:,}**", inline=True)
         embed.add_field(name="Leaderboard (Top 10)", value="\n".join(lb_lines), inline=False)
         embed.add_field(name="Recent Big Wins", value="\n".join(feed_lines), inline=False)
         if last_cfg_date:

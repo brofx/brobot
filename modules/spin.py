@@ -22,6 +22,7 @@ import random
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
+import time
 
 import discord
 from discord.ext import commands
@@ -48,6 +49,8 @@ MEGA_MIN_POINTS = 1000
 MEGA_COST_FRACTION = 0.10
 MEGA_PAYOUT_MULT = 3.0  # global multiplier applied to the spin total when using MEGA
 JACKPOT_MIN_MATCHES = 20
+COOLDOWN_SECONDS = 300  # 5 minutes
+NORMAL_TOKENS_CAP = 3   # up to 3 stored normal spins
 
 # Redis keys
 K_MESSAGE_ID = "slots:message_id"
@@ -58,6 +61,8 @@ K_CONFIG_DATE = "slots:last_config_date"   # date we last loaded config for (NY 
 K_STATS_SPINS = "slots:stats:spins"        # hash user_id -> total spins (all-time)
 K_STATS_WINNINGS = "slots:stats:winnings"  # hash user_id -> total winnings (all-time)
 K_JACKPOT_POOL = "slots:jackpot:pool"
+K_NORMAL_TOKENS = "slots:ntokens:{user_id}"  # int 0..3
+K_NORMAL_LAST   = "slots:nlast:{user_id}"    # epoch seconds of last refill calc
 
 # Optional: track mega spins separately
 K_STATS_SPINS_MEGA = "slots:stats:spins_mega"      # hash user_id -> total mega spins
@@ -217,17 +222,38 @@ class SlotsCog(commands.Cog):
         await self._refresh_channel_message()
         await ctx.reply("Slots config reloaded and message refreshed. ✅", mention_author=False)
 
-    @commands.command(name="slots_reset", help="Reset today's spin counters (NY day) so everyone can spin again. (manage_guild)")
+    @commands.command(name="refill_spins", help="Refill NORMAL spins to max (3) for all tracked users and reset today's MEGA spin usage. (manage_guild)")
     @commands.has_guild_permissions(manage_guild=True)
     @commands.guild_only()
-    async def slots_reset(self, ctx: commands.Context):
-        # Delete all keys matching today's plays counters
-        pattern = f"slots:plays:{ny_date_str()}:*"
-        deleted = 0
-        async for key in self.r.scan_iter(match=pattern):
-            await self.r.delete(key)
-            deleted += 1
-        await ctx.reply(f"Reset today's spin counters. Cleared **{deleted}** entries.", mention_author=False)
+    async def refill_spins(self, ctx: commands.Context):
+        now = int(time.time())
+        today = ny_date_str()
+
+        # 1) NORMAL spins: set all existing token keys to cap and bump their last timestamps
+        set_count = 0
+        pipe = self.r.pipeline()
+        async for tkey in self.r.scan_iter(match="slots:ntokens:*"):
+            uid_part = tkey.rsplit(":", 1)[-1]
+            lkey = f"slots:nlast:{uid_part}"
+            pipe.set(tkey, NORMAL_TOKENS_CAP)
+            pipe.set(lkey, now)
+            set_count += 1
+            # execute in batches to avoid huge pipelines
+            if set_count % 500 == 0:
+                await pipe.execute()
+                pipe = self.r.pipeline()
+        await pipe.execute()
+
+        # 2) MEGA spins: clear today's per-user counters
+        cleared_mega = 0
+        async for mkey in self.r.scan_iter(match=f"slots:megaplays:{today}:*"):
+            cleared_mega += await self.r.delete(mkey)
+
+        await ctx.reply(
+            f"Refilled NORMAL spins for **{set_count}** users to {NORMAL_TOKENS_CAP} and "
+            f"reset today's MEGA usage (**{cleared_mega}** entries cleared).",
+            mention_author=False
+        )
 
     @commands.command(name="slots_hard_reset", help="Hard reset: clears ALL plays, leaderboard, total spins, total winnings, big-wins feed, and jackpot. (manage_guild)")
     @commands.has_guild_permissions(manage_guild=True)
@@ -271,24 +297,17 @@ class SlotsCog(commands.Cog):
 
         # NORMAL spin: enforce cooldown
         if not mega:
-            cd_key = K_NORMAL_CD.format(user_id=user.id)
-            ttl = await self.r.ttl(cd_key)
-            if ttl and ttl > 0:
-                mins = ttl // 60
-                secs = ttl % 60
+            # token-bucket check
+            tokens, next_in = await self._refill_normal_tokens(user.id)
+            if tokens <= 0:
+                mins, secs = divmod(next_in, 60)
                 return await interaction.response.send_message(
-                    f"You're on cooldown. Try again in **{mins}m {secs}s**.", ephemeral=True
+                    f"No normal spins available. Next charge in **{mins}m {secs}s** "
+                    f"(you can store up to **{NORMAL_TOKENS_CAP}**).",
+                    ephemeral=True
                 )
-            # acquire cooldown
-            ok = await self.r.set(cd_key, "1", ex=COOLDOWN_SECONDS, nx=True)
-            if not ok:
-                # race: someone set it just now
-                ttl = await self.r.ttl(cd_key)
-                mins = max(0, ttl // 60)
-                secs = max(0, ttl % 60)
-                return await interaction.response.send_message(
-                    f"You're on cooldown. Try again in **{mins}m {secs}s**.", ephemeral=True
-                )
+            # consume one token
+            await self.r.decr(K_NORMAL_TOKENS.format(user_id=user.id))
         else:
             # MEGA spin: enforce per-day count and cost
             mkey = mega_plays_key(user.id, date_str)
@@ -390,14 +409,20 @@ class SlotsCog(commands.Cog):
                 desc_lines.append(f"**You won:** {net_delta:,} {'(multiplied!)' if mult_used else ''}")
             else:
                 desc_lines.append("No win this time!")
-            # Cooldown info
-            desc_lines.append(f"**Cooldown:** {COOLDOWN_SECONDS // 60} minutes between spins")
+
+            # show remaining tokens and next refill
+            tok_left, next_in = await self._refill_normal_tokens(user.id)
+            if tok_left < NORMAL_TOKENS_CAP and next_in > 0:
+                mins, secs = divmod(next_in, 60)
+                desc_lines.append(f"**Normal spins:** {tok_left}/{NORMAL_TOKENS_CAP} (next in {mins}m {secs}s)")
+            else:
+                desc_lines.append(f"**Normal spins:** {tok_left}/{NORMAL_TOKENS_CAP}")
         else:
             # MEGA info block
             used_after = int(await self.r.get(mega_plays_key(user.id, date_str)) or 0)
             remaining = max(0, MEGA_SPINS_PER_DAY - used_after)
             # Present gross, cost, net
-            gross_line = f"Gross win (incl. MEGA x{MEGA_PAYOUT_MULT:.1f}): **{gross_win:,}**"
+            gross_line = f"Gross win (incl. MEGA x{MEGA_PAYOUT_MULT:.1f}): **{gross_total:,}**"
             cost_line = f"MEGA cost (10%): **-{cost:,}**"
             net_line = f"**Net change:** **{net_delta:,}**"
             desc_lines.extend([gross_line, cost_line, net_line, f"**MEGA spins left today:** {remaining}/{MEGA_SPINS_PER_DAY}"])
@@ -422,6 +447,58 @@ class SlotsCog(commands.Cog):
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # ---------------- Core logic ----------------
+
+    async def _refill_normal_tokens(self, user_id: int) -> tuple[int, int]:
+        """
+        Refill the user's normal-spin tokens (capacity NORMAL_TOKENS_CAP,
+        1 token every COOLDOWN_SECONDS). Returns (tokens_after_refill, seconds_until_next_token).
+        """
+        now = int(time.time())
+        tkey = K_NORMAL_TOKENS.format(user_id=user_id)
+        lkey = K_NORMAL_LAST.format(user_id=user_id)
+
+        pipe = self.r.pipeline()
+        pipe.get(tkey)
+        pipe.get(lkey)
+        cur_tokens_s, last_ts_s = await pipe.execute()
+
+        # Initialize if absent
+        if cur_tokens_s is None or last_ts_s is None:
+            tokens = NORMAL_TOKENS_CAP
+            last_ts = now
+            pipe = self.r.pipeline()
+            pipe.set(tkey, tokens)
+            pipe.set(lkey, last_ts)
+            await pipe.execute()
+            return tokens, 0
+
+        tokens = int(cur_tokens_s or 0)
+        last_ts = int(last_ts_s or now)
+
+        if tokens < NORMAL_TOKENS_CAP:
+            elapsed = max(0, now - last_ts)
+            gained = elapsed // COOLDOWN_SECONDS
+            if gained > 0:
+                tokens = min(NORMAL_TOKENS_CAP, tokens + gained)
+                # advance last_ts by whole refill steps actually used
+                last_ts = last_ts + gained * COOLDOWN_SECONDS
+                pipe = self.r.pipeline()
+                pipe.set(tkey, tokens)
+                pipe.set(lkey, last_ts)
+                await pipe.execute()
+        else:
+            # at cap: keep clock anchored to now to avoid huge deltas
+            last_ts = now
+            await self.r.set(lkey, last_ts)
+
+        # seconds until next token (0 if at cap)
+        if tokens >= NORMAL_TOKENS_CAP:
+            next_in = 0
+        else:
+            elapsed = max(0, now - last_ts)
+            next_in = COOLDOWN_SECONDS - (elapsed % COOLDOWN_SECONDS)
+
+        return tokens, next_in
 
     def _jackpot_trigger(self, grid: List[List[Item]], cfg: SlotsConfig) -> Optional[Tuple[str, int, str]]:
         """

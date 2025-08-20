@@ -24,7 +24,7 @@ REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 
 CONFIG_PATH = os.getenv("SLOTS_CONFIG_PATH", "slots_config.json")
 # How many spins per user per NY-day
-DAILY_SPINS = 3
+DAILY_SPINS = 5
 # How many big wins to keep in feed
 BIGWINS_FEED_LEN = 20
 # Leaderboard length displayed in the channel message

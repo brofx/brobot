@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 import redis.asyncio as redis
 
@@ -125,8 +124,8 @@ class SlotsCog(commands.Cog):
 
     # ---- Commands ----
 
-    @app_commands.command(name="slots_setup", description="Post/refresh the persistent Slots message in this channel (admin-only).")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @commands.command(name="slots_setup", description="Post/refresh the persistent Slots message in this channel (admin-only).")
+    @commands.has_permissions(manage_guild=True)
     async def slots_setup(self, interaction: discord.Interaction):
         await self._ensure_config_for_today()
 
@@ -158,8 +157,8 @@ class SlotsCog(commands.Cog):
 
         await interaction.response.send_message("Slots message is set up (or refreshed) here. 🎰", ephemeral=True)
 
-    @app_commands.command(name="slots_reload", description="Reload the slots config file (admin-only).")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @commands.command(name="slots_reload", description="Reload the slots config file (admin-only).")
+    @commands.has_permissions(manage_guild=True)
     async def slots_reload(self, interaction: discord.Interaction):
         await self._ensure_config_for_today()  # ensure we have something pre-loaded
         # Force reload regardless of date

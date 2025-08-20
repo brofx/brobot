@@ -5,8 +5,8 @@ import aiohttp
 import discord
 from discord.ext import commands
 
-# import logging
-# logging.basicConfig(level=logging.INFO)
+import logging
+discord.utils.setup_logging(level=logging.INFO, root=True)
 
 discord_key: str = os.getenv("DISCORD_KEY")
 

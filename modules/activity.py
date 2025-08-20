@@ -1,8 +1,5 @@
-from datetime import datetime
-
 import discord
 import redis
-import pendulum
 import calendar
 from datetime import datetime
 from discord.ext import commands
@@ -76,7 +73,8 @@ class ActivityTracker(commands.Cog, name="Activity Module"):
         last_seen = self.redis.hget(SEEN_KEY, target_user.id)
         if last_seen:
             utc, message = last_seen.split("::")
-            time_str = pendulum.from_timestamp(int(utc)).to_datetime_string()
+            dt_object = datetime.fromtimestamp(int(utc))
+            time_str = dt_object.strftime("%Y-%m-%d %H:%M:%S")
             return await ctx.send(
                 "Last time I saw {} was on {} saying {}".format(target_user.display_name, time_str, message))
         else:

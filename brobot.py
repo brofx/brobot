@@ -13,7 +13,7 @@ discord_key: str = os.getenv("DISCORD_KEY")
 brobot_modules = ["modules.8ball", "modules.activity", "modules.backstreet_boys", "modules.base", "modules.choose",
                   "modules.egs", "modules.f1", "modules.game_tag", "modules.gdq", "modules.hltb", "modules.imdb",
                   "modules.kym", "modules.name_colors", "modules.nubeer", "modules.poll", "modules.roll",
-                  "modules.silly", "modules.split", "modules.stocks", "modules.urbandict"]
+                  "modules.silly", "modules.split", "modules.stocks", "modules.urbandict", "modules.spin"]
 
 intents = discord.Intents.default()
 intents.guilds = True

@@ -188,6 +188,35 @@ class SlotsCog(commands.Cog):
             deleted += 1
         await ctx.reply(f"Reset today's spin counters. Cleared **{deleted}** entries.", mention_author=False)
 
+    @commands.command(name="slots_hard_reset", help="Hard reset: clears ALL plays (all dates), leaderboard, total spins, total winnings, and big-wins feed. (manage_guild)")
+    @commands.has_guild_permissions(manage_guild=True)
+    @commands.guild_only()
+    async def slots_hard_reset(self, ctx: commands.Context):
+        # Delete all per-day spin counters across all dates
+        deleted_plays = 0
+        async for key in self.r.scan_iter(match="slots:plays:*"):
+            deleted_plays += await self.r.delete(key)
+
+        # Delete global stats/feeds
+        del_other = await self.r.delete(
+            K_LEADERBOARD,   # zset of total winnings
+            K_STATS_SPINS,   # hash user_id -> total spins
+            K_STATS_WINNINGS,# hash user_id -> total winnings
+            K_BIGWINS        # list of recent big wins
+        )
+
+        # Refresh the persistent message (if present) so it reflects the cleared state
+        try:
+            await self._refresh_channel_message()
+        except Exception:
+            pass
+
+        await ctx.reply(
+            f"**Hard reset complete.** Cleared `{deleted_plays}` daily-play keys and `{del_other}` global data keys "
+            "(leaderboard, total spins, total winnings, big-wins).",
+            mention_author=False
+        )
+
     # ---------------- Spin handling (button interaction) ----------------
 
     async def handle_spin(self, interaction: discord.Interaction):

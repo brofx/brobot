@@ -42,6 +42,11 @@ CONFIG_PATH = os.getenv("SLOTS_CONFIG_PATH", "slots_config.json")
 DAILY_SPINS = 5
 BIGWINS_FEED_LEN = 20
 LEADERBOARD_LEN = 10
+COOLDOWN_SECONDS = 300  # 5 minutes
+MEGA_SPINS_PER_DAY = 3
+MEGA_MIN_POINTS = 1000
+MEGA_COST_FRACTION = 0.10
+MEGA_PAYOUT_MULT = 3.0  # global multiplier applied to the spin total when using MEGA
 
 # Redis keys
 K_MESSAGE_ID = "slots:message_id"
@@ -51,6 +56,15 @@ K_BIGWINS = "slots:bigwins"                # list of JSON entries (newest left)
 K_CONFIG_DATE = "slots:last_config_date"   # date we last loaded config for (NY day)
 K_STATS_SPINS = "slots:stats:spins"        # hash user_id -> total spins (all-time)
 K_STATS_WINNINGS = "slots:stats:winnings"  # hash user_id -> total winnings (all-time)
+
+# Optional: track mega spins separately
+K_STATS_SPINS_MEGA = "slots:stats:spins_mega"      # hash user_id -> total mega spins
+
+K_NORMAL_CD = "slots:cd:{user_id}"                 # string key with TTL=COOLDOWN_SECONDS
+# Keep old per-day plays keys for backward compatibility (not used for normal now)
+# We'll introduce mega-per-day counter:
+def mega_plays_key(user_id: int, date_str: str) -> str:
+    return f"slots:megaplays:{date_str}:{user_id}"
 
 def ny_date_str(dt: Optional[datetime] = None) -> str:
     if dt is None:
@@ -83,12 +97,19 @@ class SlotsSpinView(discord.ui.View):
     def __init__(self, *, timeout: Optional[float] = None):
         super().__init__(timeout=timeout)
 
-    @discord.ui.button(label="🎰 Spin", style=discord.ButtonStyle.primary, custom_id="slots:spin")
-    async def spin(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="🎰 Spin", style=discord.ButtonStyle.primary, custom_id="slots:spin:normal")
+    async def spin_normal(self, interaction: discord.Interaction, button: discord.ui.Button):
         cog: "SlotsCog" = interaction.client.get_cog("SlotsCog")  # type: ignore
         if not cog:
             return await interaction.response.send_message("Slots are temporarily unavailable.", ephemeral=True)
-        await cog.handle_spin(interaction)
+        await cog.handle_spin(interaction, mega=False)
+
+    @discord.ui.button(label="💥 MEGA Spin", style=discord.ButtonStyle.danger, custom_id="slots:spin:mega")
+    async def spin_mega(self, interaction: discord.Interaction, button: discord.ui.Button):
+        cog: "SlotsCog" = interaction.client.get_cog("SlotsCog")  # type: ignore
+        if not cog:
+            return await interaction.response.send_message("Slots are temporarily unavailable.", ephemeral=True)
+        await cog.handle_spin(interaction, mega=True)
 
 class SlotsCog(commands.Cog):
     """5x5 emoji slots with daily limits, persistent channel message, leaderboard, and big-wins feed."""
@@ -219,45 +240,92 @@ class SlotsCog(commands.Cog):
 
     # ---------------- Spin handling (button interaction) ----------------
 
-    async def handle_spin(self, interaction: discord.Interaction):
+    async def handle_spin(self, interaction: discord.Interaction, *, mega: bool):
         await self._ensure_config_for_today()
         assert self._config is not None
         cfg = self._config
 
         user = interaction.user
+        user_id = str(user.id)
         date_str = ny_date_str()
-        pkey = plays_key(user.id, date_str)
-        plays = int(await self.r.get(pkey) or 0)
-        if plays >= DAILY_SPINS:
-            return await interaction.response.send_message(
-                f"You've used your **{DAILY_SPINS}** spins for today. Come back after midnight ET!",
-                ephemeral=True
-            )
 
-        # Pre-increment plays (prevents double-click race)
-        await self.r.incr(pkey)
-        await self.r.expire(pkey, 60 * 60 * 48)
+        # NORMAL spin: enforce cooldown
+        if not mega:
+            cd_key = K_NORMAL_CD.format(user_id=user.id)
+            ttl = await self.r.ttl(cd_key)
+            if ttl and ttl > 0:
+                mins = ttl // 60
+                secs = ttl % 60
+                return await interaction.response.send_message(
+                    f"You're on cooldown. Try again in **{mins}m {secs}s**.", ephemeral=True
+                )
+            # acquire cooldown
+            ok = await self.r.set(cd_key, "1", ex=COOLDOWN_SECONDS, nx=True)
+            if not ok:
+                # race: someone set it just now
+                ttl = await self.r.ttl(cd_key)
+                mins = max(0, ttl // 60)
+                secs = max(0, ttl % 60)
+                return await interaction.response.send_message(
+                    f"You're on cooldown. Try again in **{mins}m {secs}s**.", ephemeral=True
+                )
+        else:
+            # MEGA spin: enforce per-day count and cost
+            mkey = mega_plays_key(user.id, date_str)
+            used = int(await self.r.get(mkey) or 0)
+            if used >= MEGA_SPINS_PER_DAY:
+                return await interaction.response.send_message(
+                    f"You've used your **{MEGA_SPINS_PER_DAY}** MEGA spins for today. Come back after midnight ET!",
+                    ephemeral=True
+                )
+
+            total_points = int(await self.r.hget(K_STATS_WINNINGS, user_id) or 0)
+            if total_points <= MEGA_MIN_POINTS:
+                return await interaction.response.send_message(
+                    f"MEGA spins require **> {MEGA_MIN_POINTS:,}** points. You currently have **{total_points:,}**.",
+                    ephemeral=True
+                )
+
+            cost = max(1, int(total_points * MEGA_COST_FRACTION))
+
+            # Deduct cost up-front (incorporated into net result)
+            await self.r.hincrby(K_STATS_WINNINGS, user_id, -cost)
+            await self.r.zincrby(K_LEADERBOARD, -cost, user_id)
+
+            # Record today's MEGA usage
+            await self.r.incr(mkey)
+            await self.r.expire(mkey, 60 * 60 * 48)  # expire after 48h to avoid clutter
 
         # Perform spin
-        grid, total_win, breakdown, mult_used = self._spin_and_score(cfg)
+        bonus_mult = MEGA_PAYOUT_MULT if mega else 1.0
+        grid, base_total, breakdown, mult_used = self._spin_and_score(cfg, bonus_multiplier=bonus_mult)
 
-        # Update stats (all-time)
-        await self.r.hincrby(K_STATS_SPINS, str(user.id), 1)
-        if total_win > 0:
-            await self.r.hincrby(K_STATS_WINNINGS, str(user.id), total_win)
-            await self.r.zincrby(K_LEADERBOARD, total_win, str(user.id))
-            if total_win >= cfg.big_win_threshold:
-                entry = {
-                    "user_id": user.id,
-                    "username": getattr(user, "global_name", None) or user.name,
-                    "amount": total_win,
-                    "date": date_str
-                }
-                await self.r.lpush(K_BIGWINS, json.dumps(entry))
-                await self.r.ltrim(K_BIGWINS, 0, BIGWINS_FEED_LEN - 1)
-        else:
-            # ensure total winnings hash exists even if zero (optional)
-            await self.r.hsetnx(K_STATS_WINNINGS, str(user.id), 0)
+        # Compute net (mega includes cost already deducted from storage; but we present net)
+        gross_win = base_total
+        net_delta = gross_win
+        if mega:
+            net_delta = gross_win - cost  # since cost already deducted from storage
+
+        # Update stats
+        await self.r.hincrby(K_STATS_SPINS, user_id, 1)
+        if mega:
+            await self.r.hincrby(K_STATS_SPINS_MEGA, user_id, 1)
+
+        if net_delta != 0:
+            await self.r.hincrby(K_STATS_WINNINGS, user_id, net_delta)
+            await self.r.zincrby(K_LEADERBOARD, net_delta, user_id)
+
+        # Big win feed uses gross result (or net? choose net to reflect true gain)
+        if net_delta >= cfg.big_win_threshold:
+            entry = {
+                "user_id": user.id,
+                "username": getattr(user, "global_name", None) or user.name,
+                "amount": net_delta,
+                "date": date_str,
+                "mega": mega
+            }
+            await self.r.lpush(K_BIGWINS, json.dumps(entry))
+            await self.r.ltrim(K_BIGWINS, 0, BIGWINS_FEED_LEN - 1)
 
         # Refresh persistent message (best-effort)
         try:
@@ -265,31 +333,42 @@ class SlotsCog(commands.Cog):
         except Exception:
             pass
 
-        remaining = max(0, DAILY_SPINS - (plays + 1))
-
         # Build ephemeral result
         grid_str = self._render_grid(grid)
+
+        total_spins = int(await self.r.hget(K_STATS_SPINS, user_id) or 0)
+        total_wins_accum = int(await self.r.hget(K_STATS_WINNINGS, user_id) or 0)
+        avg = (total_wins_accum / total_spins) if total_spins > 0 else 0.0
+
         desc_lines = []
-        if total_win > 0:
-            desc_lines.append(f"**You won:** {total_win:,} {'(multiplied!)' if mult_used else ''}")
+        title = "🎰 Your Spin Result" if not mega else "💥 MEGA Spin Result"
+
+        if not mega:
+            if net_delta > 0:
+                desc_lines.append(f"**You won:** {net_delta:,} {'(multiplied!)' if mult_used else ''}")
+            else:
+                desc_lines.append("No win this time!")
+            # Cooldown info
+            desc_lines.append(f"**Cooldown:** {COOLDOWN_SECONDS // 60} minutes between spins")
         else:
-            desc_lines.append("No win this time!")
+            # MEGA info block
+            used_after = int(await self.r.get(mega_plays_key(user.id, date_str)) or 0)
+            remaining = max(0, MEGA_SPINS_PER_DAY - used_after)
+            # Present gross, cost, net
+            gross_line = f"Gross win (incl. MEGA x{MEGA_PAYOUT_MULT:.1f}): **{gross_win:,}**"
+            cost_line = f"MEGA cost (10%): **-{cost:,}**"
+            net_line = f"**Net change:** **{net_delta:,}**"
+            desc_lines.extend([gross_line, cost_line, net_line, f"**MEGA spins left today:** {remaining}/{MEGA_SPINS_PER_DAY}"])
 
         if breakdown:
             desc_lines += [f"- {line}" for line in breakdown]
 
-        # Compute user's all-time stats for this footer
-        total_spins = int(await self.r.hget(K_STATS_SPINS, str(user.id)) or 0)
-        total_wins_accum = int(await self.r.hget(K_STATS_WINNINGS, str(user.id)) or 0)
-        avg = (total_wins_accum / total_spins) if total_spins > 0 else 0.0
-
-        desc_lines.append(f"**Spins left today:** {remaining}/{DAILY_SPINS}")
-        desc_lines.append(f"**Your totals:** spins={total_spins}, winnings={total_wins_accum:,}, avg/spin={avg:.2f}")
+        desc_lines.append(f"**Your totals:** spins={total_spins}, points={total_wins_accum:,}, avg/spin={avg:.2f}")
 
         embed = discord.Embed(
-            title="🎰 Your Spin Result",
+            title=title,
             description="\n".join(desc_lines),
-            color=discord.Color.green() if total_win > 0 else discord.Color.dark_gray()
+            color=discord.Color.orange() if mega else (discord.Color.green() if net_delta > 0 else discord.Color.dark_gray())
         )
         embed.add_field(name="Grid", value=grid_str, inline=False)
 
@@ -303,7 +382,7 @@ class SlotsCog(commands.Cog):
     def _render_grid(self, grid: List[List[Item]]) -> str:
         return "\n".join(" ".join(cell.emoji for cell in row) for row in grid)
 
-    def _spin_and_score(self, cfg: SlotsConfig) -> Tuple[List[List[Item]], int, List[str], bool]:
+    def _spin_and_score(self, cfg: SlotsConfig, *, bonus_multiplier: float = 1.0) -> Tuple[List[List[Item]], int, List[str], bool]:
         population = cfg.items
         weights = [max(0.0, it.weight) for it in population]
 
@@ -354,13 +433,12 @@ class SlotsCog(commands.Cog):
             name = ref_item.emoji if ref_item else best_key
             return line_win, f"{name} x{best_count} → {line_win:,}"
 
-        # rows
         for r in range(5):
             amt, info = score_line(grid[r])
             total += amt
             if info and amt > 0:
                 breakdown.append(f"Row {r+1}: {info}")
-        # cols
+
         for c in range(5):
             col = [grid[r][c] for r in range(5)]
             amt, info = score_line(col)
@@ -368,13 +446,15 @@ class SlotsCog(commands.Cog):
             if info and amt > 0:
                 breakdown.append(f"Col {c+1}: {info}")
 
-        # Multipliers anywhere multiply TOTAL (stacking)
         mults = [it.multiplier for row in grid for it in row if it.is_multiplier and it.multiplier > 1]
         mult_product = 1
         for m in mults:
             mult_product *= m
         mult_used = mult_product > 1
+
         total *= mult_product
+        if bonus_multiplier != 1.0:
+            total = int(total * bonus_multiplier)
 
         return grid, total, breakdown, mult_used
 

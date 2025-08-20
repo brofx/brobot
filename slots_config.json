@@ -1,6 +1,6 @@
 {
   "title": "BRFX Spin2Win",
-  "instructions": "Press **Spin** to roll a 5×5 board. Rows/Cols with 3+ matching symbols (wilds substitute) pay base value × match count. Any multiplier anywhere multiplies the total (stacking). You get **5 spins per day** (resets at midnight ET). Big wins are logged to the feed. Good luck!",
+  "instructions": "Press **Spin** for a normal play (5×5 board). Rows/Cols with **3+ matching symbols** pay **base value × match count**; 🃏 wilds substitute. Any ✖️ multipliers anywhere on the board **stack and multiply your total**.\n\n**Normal Spins:** 1 spin every **5 minutes** per user (no daily cap).\n\n**💥 MEGA Spins:** **3 per day**, reset at **midnight ET (America/New_York)**. Requires **> 1,000 points** and costs **10% of your current points** up front. MEGA spins grant **boosted payouts** (on top of in-grid multipliers). The result shown is your **net change** (gross win − cost).\n\nThe message shows a **Top 10 leaderboard** (total points, total spins, avg/spin) and **recent big wins**. Good luck!",
   "big_win_threshold": 5000,
   "items": [
     { "key": "wild", "emoji": "🃏", "weight": 4, "base_value": 50, "is_wild": true },

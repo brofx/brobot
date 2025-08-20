@@ -1,17 +1,17 @@
 {
   "title": "BRFX Spin2Win",
-  "instructions": "Press **Spin** for a normal play (5×5 board). Rows/Cols with **3+ matching symbols** pay **base value × match count**; 🃏 wilds substitute. Any ✖️ multipliers anywhere on the board **stack and multiply your total**.\n\n**Normal Spins:** 1 spin every **5 minutes** per user (no daily cap).\n\n**💥 MEGA Spins:** **3 per day**, reset at **midnight ET (America/New_York)**. Requires **> 1,000 points** and costs **10% of your current points** up front. MEGA spins grant **boosted payouts** (on top of in-grid multipliers). The result shown is your **net change** (gross win − cost).\n\nThe message shows a **Top 10 leaderboard** (total points, total spins, avg/spin) and **recent big wins**. Good luck!",
+  "instructions": "Press **Spin** for a normal play (5×5 board). Rows/Cols with **3+ matching symbols** pay **base value × match count**; <:Brofox:274720106129653767> wilds substitute. Any ✖️ multipliers anywhere on the board **stack and multiply your total**.\n\n**Normal Spins:** 1 spin every **5 minutes** per user (no daily cap).\n\n**💥 MEGA Spins:** **3 per day**, reset at **midnight ET (America/New_York)**. Requires **> 1,000 points** and costs **10% of your current points** up front. MEGA spins grant **boosted payouts** (on top of in-grid multipliers). The result shown is your **net change** (gross win − cost).\n\nThe message shows a **Top 10 leaderboard** (total points, total spins, avg/spin) and **recent big wins**. Good luck!",
   "big_win_threshold": 5000,
   "items": [
-    { "key": "wild", "emoji": "🃏", "weight": 4, "base_value": 50, "is_wild": true },
+    { "key": "wild", "emoji_id": 274720106129653767, "emoji_name": "Brofox", "emoji_animated": false, "weight": 4, "base_value": 50, "is_wild": true },
 
-    { "key": "cherry", "emoji": "🍒", "weight": 20, "base_value": 20 },
-    { "key": "lemon",  "emoji": "🍋", "weight": 20, "base_value": 20 },
-    { "key": "grape",  "emoji": "🍇", "weight": 16, "base_value": 30 },
-    { "key": "bell",   "emoji": "🔔", "weight": 12, "base_value": 40 },
-    { "key": "bar",    "emoji": "🅱️", "weight": 10, "base_value": 60 },
-    { "key": "gem",    "emoji": "💎", "weight": 6,  "base_value": 100 },
-    { "key": "seven",  "emoji": "7️⃣", "weight": 4,  "base_value": 150 },
+    { "key": "cherry", "emoji_id": 814699556339712060, "emoji_name": "Guck", "emoji_animated": false, "weight": 20, "base_value": 20 },
+    { "key": "lemon",  "emoji_id": 763061696439910450, "emoji_name": "wtfJOE", "emoji_animated": false, "weight": 20, "base_value": 20 },
+    { "key": "grape",  "emoji_id": 385591156471234581, "emoji_name": "yee", "emoji_animated": false, "weight": 16, "base_value": 30 },
+    { "key": "bell",   "emoji_id": 730785998790983683, "emoji_name": "YEP", "emoji_animated": false, "weight": 12, "base_value": 40 },
+    { "key": "bar",    "emoji_id": 776606741793734657, "emoji_name": "Pepe_King", "emoji_animated": false, "weight": 10, "base_value": 60 },
+    { "key": "gem",    "emoji_id": 750892648755232789, "emoji_name": "catJAM", "emoji_animated": true, "weight": 6,  "base_value": 100 },
+    { "key": "seven",  "emoji_id": 750892648948039781, "emoji_name": "catRAVE", "emoji_animated": true, "weight": 4,  "base_value": 150 },
 
     { "key": "m2",    "emoji": "✖️2",   "weight": 5,    "base_value": 0, "is_multiplier": true, "multiplier": 2 },
     { "key": "m5",    "emoji": "✖️5",   "weight": 2.5,  "base_value": 0, "is_multiplier": true, "multiplier": 5 },

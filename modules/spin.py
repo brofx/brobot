@@ -79,12 +79,25 @@ def plays_key(user_id: int, date_str: Optional[str] = None) -> str:
 @dataclass
 class Item:
     key: str
-    emoji: str
     weight: float
     base_value: int
     is_wild: bool = False
     is_multiplier: bool = False
     multiplier: int = 1
+
+    # emoji can be a plain Unicode emoji OR a literal Discord mention "<:name:id>" / "<a:name:id>"
+    emoji: Optional[str] = None
+
+    # OR specify Discord custom emoji parts directly (preferred if you have the id)
+    emoji_id: Optional[int] = None
+    emoji_name: Optional[str] = None
+    emoji_animated: bool = False
+
+    def token(self) -> str:
+        if self.emoji_id and self.emoji_name:
+            prefix = "a" if self.emoji_animated else ""
+            return f"<{prefix}:{self.emoji_name}:{self.emoji_id}>"
+        return self.emoji or ""
 
 @dataclass
 class SlotsConfig:
@@ -138,12 +151,17 @@ class SlotsCog(commands.Cog):
         for it in raw["items"]:
             items.append(Item(
                 key=it["key"],
-                emoji=it["emoji"],
                 weight=float(it.get("weight", 1)),
                 base_value=int(it.get("base_value", 0)),
                 is_wild=bool(it.get("is_wild", False)),
                 is_multiplier=bool(it.get("is_multiplier", False)),
                 multiplier=int(it.get("multiplier", 1)),
+                # emoji may be Unicode or a literal custom-emoji mention string
+                emoji=it.get("emoji"),
+                # or provide parts for a custom emoji
+                emoji_id=(int(it["emoji_id"]) if "emoji_id" in it else None),
+                emoji_name=it.get("emoji_name"),
+                emoji_animated=bool(it.get("emoji_animated", False)),
             ))
 
         return SlotsConfig(
@@ -380,7 +398,7 @@ class SlotsCog(commands.Cog):
     # ---------------- Core logic ----------------
 
     def _render_grid(self, grid: List[List[Item]]) -> str:
-        return "\n".join(" ".join(cell.emoji for cell in row) for row in grid)
+        return "\n".join(" ".join(cell.token() for cell in row) for row in grid)
 
     def _spin_and_score(self, cfg: SlotsConfig, *, bonus_multiplier: float = 1.0) -> Tuple[List[List[Item]], int, List[str], bool]:
         population = cfg.items
@@ -430,7 +448,7 @@ class SlotsCog(commands.Cog):
 
             line_win = best_value * best_count
             ref_item = next((x for x in cfg.items if x.key == best_key), None)
-            name = ref_item.emoji if ref_item else best_key
+            name = ref_item.token() if ref_item else best_key
             return line_win, f"{name} x{best_count} → {line_win:,}"
 
         for r in range(5):
@@ -497,7 +515,7 @@ class SlotsCog(commands.Cog):
 
         last_cfg_date = await self.r.get(K_CONFIG_DATE)
         embed = discord.Embed(
-            title=f"{cfg.title} — Daily limit: {DAILY_SPINS} spins/user",
+            title=f"{cfg.title}",
             description=cfg.instructions,
             color=discord.Color.gold()
         )

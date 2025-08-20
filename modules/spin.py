@@ -1,6 +1,23 @@
+# slots_cog.py
+# Discord.py (v2.3+) extension that adds a 5x5 emoji slots game with daily limits, leaderboard, and a single persistent channel message.
+# Changes per request:
+# - Use commands.command (prefix commands) for admin actions instead of app_commands
+# - Add /slots_reset (prefix: !slots_reset) to reset daily plays for today
+# - Daily spins: 5 per user (midnight America/New_York reset)
+# - Track total spins per user; leaderboard displays total winnings, total spins, and avg per spin
+#
+# Setup:
+# 1) pip install -U "discord.py>=2.3.2" "redis>=5.0.0"
+# 2) Put a config file next to this script named "slots_config.json" (example below).
+# 3) Load the extension in your bot: await bot.load_extension("slots_cog")
+# 4) Run !slots_setup in the target channel (manage_guild required) to post/refresh the persistent message.
+#
+# Notes:
+# - The Spin button uses interactions and returns an ephemeral result to prevent channel spam.
+# - Persistent views survive restarts via bot.add_view(SlotsSpinView()) in cog_load().
+
 import os
 import json
-import math
 import random
 from dataclasses import dataclass
 from datetime import datetime
@@ -13,7 +30,6 @@ import redis.asyncio as redis
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
-    # Python < 3.9 fallback (if needed): pip install backports.zoneinfo
     from backports.zoneinfo import ZoneInfo  # type: ignore
 
 NY_TZ = ZoneInfo("America/New_York")
@@ -23,19 +39,18 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 
 CONFIG_PATH = os.getenv("SLOTS_CONFIG_PATH", "slots_config.json")
-# How many spins per user per NY-day
 DAILY_SPINS = 5
-# How many big wins to keep in feed
 BIGWINS_FEED_LEN = 20
-# Leaderboard length displayed in the channel message
 LEADERBOARD_LEN = 10
 
 # Redis keys
 K_MESSAGE_ID = "slots:message_id"
 K_CHANNEL_ID = "slots:channel_id"
-K_LEADERBOARD = "slots:leaderboard"        # sorted set (score = total winnings)
-K_BIGWINS = "slots:bigwins"                # list of JSON strings, newest on left
-K_CONFIG_DATE = "slots:last_config_date"   # last date (NY) we loaded config (for visibility; not strictly required)
+K_LEADERBOARD = "slots:leaderboard"        # zset: score = total winnings
+K_BIGWINS = "slots:bigwins"                # list of JSON entries (newest left)
+K_CONFIG_DATE = "slots:last_config_date"   # date we last loaded config for (NY day)
+K_STATS_SPINS = "slots:stats:spins"        # hash user_id -> total spins (all-time)
+K_STATS_WINNINGS = "slots:stats:winnings"  # hash user_id -> total winnings (all-time)
 
 def ny_date_str(dt: Optional[datetime] = None) -> str:
     if dt is None:
@@ -62,12 +77,10 @@ class SlotsConfig:
     title: str
     instructions: str
     items: List[Item]
-    # When a total spin result >= big_win_threshold, log to recent big wins
     big_win_threshold: int
 
 class SlotsSpinView(discord.ui.View):
     def __init__(self, *, timeout: Optional[float] = None):
-        # persistent view (no timeout)
         super().__init__(timeout=timeout)
 
     @discord.ui.button(label="🎰 Spin", style=discord.ButtonStyle.primary, custom_id="slots:spin")
@@ -75,11 +88,10 @@ class SlotsSpinView(discord.ui.View):
         cog: "SlotsCog" = interaction.client.get_cog("SlotsCog")  # type: ignore
         if not cog:
             return await interaction.response.send_message("Slots are temporarily unavailable.", ephemeral=True)
-
         await cog.handle_spin(interaction)
 
 class SlotsCog(commands.Cog):
-    """A 5x5 emoji slots game with daily limits, a persistent channel message, leaderboard, and big-wins feed."""
+    """5x5 emoji slots with daily limits, persistent channel message, leaderboard, and big-wins feed."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -88,7 +100,6 @@ class SlotsCog(commands.Cog):
         self._config_loaded_for_date: Optional[str] = None
 
     async def cog_load(self):
-        # Ensure persistent view is registered on load/restart
         self.bot.add_view(SlotsSpinView())
 
     async def _ensure_config_for_today(self):
@@ -96,7 +107,6 @@ class SlotsCog(commands.Cog):
         if self._config is None or self._config_loaded_for_date != today:
             self._config = await self._load_config()
             self._config_loaded_for_date = today
-            # Store visible record of last load date
             await self.r.set(K_CONFIG_DATE, today)
 
     async def _load_config(self) -> SlotsConfig:
@@ -122,19 +132,17 @@ class SlotsCog(commands.Cog):
             big_win_threshold=int(raw.get("big_win_threshold", 1_000))
         )
 
-    # ---- Commands ----
+    # ---------------- Admin (prefix) commands ----------------
 
-    @commands.command(name="slots_setup", description="Post/refresh the persistent Slots message in this channel (admin-only).")
-    @commands.has_permissions(manage_guild=True)
-    async def slots_setup(self, interaction: discord.Interaction):
+    @commands.command(name="slots_setup", help="Post/refresh the persistent Slots message in this channel. (manage_guild)")
+    @commands.has_guild_permissions(manage_guild=True)
+    @commands.guild_only()
+    async def slots_setup(self, ctx: commands.Context):
         await self._ensure_config_for_today()
 
-        # Create or refresh the persistent message in the current channel
-        channel = interaction.channel
-        if not isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
-            return await interaction.response.send_message("Please run this in a text channel.", ephemeral=True)
+        if not isinstance(ctx.channel, (discord.TextChannel, discord.Thread)):
+            return await ctx.reply("Please run this in a text channel.", mention_author=False)
 
-        # Compose initial embed/content
         view = SlotsSpinView()
         embed = await self._compose_main_embed()
 
@@ -142,36 +150,45 @@ class SlotsCog(commands.Cog):
         chan_id = await self.r.get(K_CHANNEL_ID)
         posted: Optional[discord.Message] = None
 
-        if msg_id and chan_id and int(chan_id) == channel.id:
+        if msg_id and chan_id and int(chan_id) == ctx.channel.id:
             try:
-                posted = await channel.fetch_message(int(msg_id))
+                posted = await ctx.channel.fetch_message(int(msg_id))
                 await posted.edit(embed=embed, view=view, content=None)
             except Exception:
-                posted = None  # fall through to send a new one
+                posted = None
 
         if posted is None:
-            posted = await channel.send(embed=embed, view=view)
+            posted = await ctx.channel.send(embed=embed, view=view)
 
         await self.r.set(K_MESSAGE_ID, posted.id)
         await self.r.set(K_CHANNEL_ID, posted.channel.id)
 
-        await interaction.response.send_message("Slots message is set up (or refreshed) here. 🎰", ephemeral=True)
+        await ctx.reply("Slots message is set up (or refreshed) here. 🎰", mention_author=False)
 
-    @commands.command(name="slots_reload", description="Reload the slots config file (admin-only).")
-    @commands.has_permissions(manage_guild=True)
-    async def slots_reload(self, interaction: discord.Interaction):
-        await self._ensure_config_for_today()  # ensure we have something pre-loaded
-        # Force reload regardless of date
+    @commands.command(name="slots_reload", help="Reload the slots config file and refresh the message. (manage_guild)")
+    @commands.has_guild_permissions(manage_guild=True)
+    @commands.guild_only()
+    async def slots_reload(self, ctx: commands.Context):
+        await self._ensure_config_for_today()
         self._config = await self._load_config()
         self._config_loaded_for_date = ny_date_str()
         await self.r.set(K_CONFIG_DATE, self._config_loaded_for_date)
-
-        # Try refreshing the persistent message
         await self._refresh_channel_message()
+        await ctx.reply("Slots config reloaded and message refreshed. ✅", mention_author=False)
 
-        await interaction.response.send_message("Slots config reloaded and message refreshed. ✅", ephemeral=True)
+    @commands.command(name="slots_reset", help="Reset today's spin counters (NY day) so everyone can spin again. (manage_guild)")
+    @commands.has_guild_permissions(manage_guild=True)
+    @commands.guild_only()
+    async def slots_reset(self, ctx: commands.Context):
+        # Delete all keys matching today's plays counters
+        pattern = f"slots:plays:{ny_date_str()}:*"
+        deleted = 0
+        async for key in self.r.scan_iter(match=pattern):
+            await self.r.delete(key)
+            deleted += 1
+        await ctx.reply(f"Reset today's spin counters. Cleared **{deleted}** entries.", mention_author=False)
 
-    # ---- Interaction handling ----
+    # ---------------- Spin handling (button interaction) ----------------
 
     async def handle_spin(self, interaction: discord.Interaction):
         await self._ensure_config_for_today()
@@ -188,27 +205,32 @@ class SlotsCog(commands.Cog):
                 ephemeral=True
             )
 
-        # Record play (pre-increment to avoid race on double-click)
+        # Pre-increment plays (prevents double-click race)
         await self.r.incr(pkey)
-        await self.r.expire(pkey, 60 * 60 * 48)  # expire in 48h to avoid clutter
+        await self.r.expire(pkey, 60 * 60 * 48)
 
         # Perform spin
         grid, total_win, breakdown, mult_used = self._spin_and_score(cfg)
 
-        # Update leaderboard & big-wins feed
+        # Update stats (all-time)
+        await self.r.hincrby(K_STATS_SPINS, str(user.id), 1)
         if total_win > 0:
+            await self.r.hincrby(K_STATS_WINNINGS, str(user.id), total_win)
             await self.r.zincrby(K_LEADERBOARD, total_win, str(user.id))
             if total_win >= cfg.big_win_threshold:
                 entry = {
                     "user_id": user.id,
-                    "username": f"{user.name}#{user.discriminator}" if hasattr(user, "discriminator") else user.name,
+                    "username": getattr(user, "global_name", None) or user.name,
                     "amount": total_win,
                     "date": date_str
                 }
                 await self.r.lpush(K_BIGWINS, json.dumps(entry))
                 await self.r.ltrim(K_BIGWINS, 0, BIGWINS_FEED_LEN - 1)
+        else:
+            # ensure total winnings hash exists even if zero (optional)
+            await self.r.hsetnx(K_STATS_WINNINGS, str(user.id), 0)
 
-        # Try refreshing the persistent message (not critical if it fails)
+        # Refresh persistent message (best-effort)
         try:
             await self._refresh_channel_message()
         except Exception:
@@ -227,7 +249,13 @@ class SlotsCog(commands.Cog):
         if breakdown:
             desc_lines += [f"- {line}" for line in breakdown]
 
+        # Compute user's all-time stats for this footer
+        total_spins = int(await self.r.hget(K_STATS_SPINS, str(user.id)) or 0)
+        total_wins_accum = int(await self.r.hget(K_STATS_WINNINGS, str(user.id)) or 0)
+        avg = (total_wins_accum / total_spins) if total_spins > 0 else 0.0
+
         desc_lines.append(f"**Spins left today:** {remaining}/{DAILY_SPINS}")
+        desc_lines.append(f"**Your totals:** spins={total_spins}, winnings={total_wins_accum:,}, avg/spin={avg:.2f}")
 
         embed = discord.Embed(
             title="🎰 Your Spin Result",
@@ -236,89 +264,63 @@ class SlotsCog(commands.Cog):
         )
         embed.add_field(name="Grid", value=grid_str, inline=False)
 
-        # Ephemeral response
         if interaction.response.is_done():
             await interaction.followup.send(embed=embed, ephemeral=True)
         else:
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    # ---- Core logic ----
+    # ---------------- Core logic ----------------
 
     def _render_grid(self, grid: List[List[Item]]) -> str:
-        # Render 5x5 emojis in a nice codeblock-like monospace table (Discord doesn't truly monospace emojis, but this is fine)
-        lines = []
-        for row in grid:
-            lines.append(" ".join(cell.emoji for cell in row))
-        return "\n".join(lines)
+        return "\n".join(" ".join(cell.emoji for cell in row) for row in grid)
 
     def _spin_and_score(self, cfg: SlotsConfig) -> Tuple[List[List[Item]], int, List[str], bool]:
-        # Build weighted population
         population = cfg.items
         weights = [max(0.0, it.weight) for it in population]
 
-        # 5x5 independent draws
         grid: List[List[Item]] = []
         for _ in range(5):
             row = random.choices(population, weights=weights, k=5)
             grid.append(row)
 
-        # Score:
-        # - Consider lines: 5 rows + 5 columns = 10 lines
-        # - In each line, find the best-paying non-multiplier symbol treating wilds as substitutes.
-        # - If at least 3 matches (including wilds) for that symbol, line pays: base_value * count.
-        # - Multipliers (2x, 5x, ..., 1000x) anywhere on the board multiply the TOTAL (product).
         breakdown: List[str] = []
         total = 0
 
         def score_line(items: List[Item]) -> Tuple[int, Optional[str]]:
-            # exclude multipliers from being the anchor symbol
             symbols = [it for it in items if not it.is_multiplier]
-            # count wilds
             wild_count = sum(1 for it in items if it.is_wild)
-            # group by non-wild symbol key
             by_key: Dict[str, int] = {}
             for it in symbols:
                 if not it.is_wild:
                     by_key[it.key] = by_key.get(it.key, 0) + 1
 
-            best_key = None
-            best_count = 0
-            best_value = 0
-
-            # If there are no non-multiplier symbols (edge case), no payout for this line
             if not by_key and wild_count < 3:
                 return 0, None
 
-            # Consider each symbol as anchor, add wilds
-            # If no anchors but wilds >= 3, we can pay on the highest base_value symbol in config as a fallback
-            candidates: List[Tuple[str, int, int]] = []  # (key, effective_count, base_value)
+            candidates: List[Tuple[str, int, int]] = []
             if by_key:
                 for k, cnt in by_key.items():
-                    # find representative item for base_value by key
                     base_item = next((x for x in cfg.items if x.key == k), None)
                     if base_item is None:
                         continue
                     eff = cnt + wild_count
                     candidates.append((k, eff, base_item.base_value))
             else:
-                # only wilds found; pay as "wild" if wild has base_value, else 0
                 base_item = next((x for x in cfg.items if x.is_wild), None)
                 if base_item and wild_count >= 3 and base_item.base_value > 0:
                     candidates.append((base_item.key, wild_count, base_item.base_value))
 
+            best_key = None
+            best_count = 0
+            best_value = 0
             for k, eff, base_val in candidates:
-                if eff >= 3:
-                    # basic linear payout: value * count
-                    if eff > best_count or (eff == best_count and base_val > best_value):
-                        best_count = eff
-                        best_value = base_val
-                        best_key = k
+                if eff >= 3 and (eff > best_count or (eff == best_count and base_val > best_value)):
+                    best_key, best_count, best_value = k, eff, base_val
 
             if best_key is None:
                 return 0, None
 
             line_win = best_value * best_count
-            # Create a readable name/emoji for breakdown
             ref_item = next((x for x in cfg.items if x.key == best_key), None)
             name = ref_item.emoji if ref_item else best_key
             return line_win, f"{name} x{best_count} → {line_win:,}"
@@ -337,31 +339,37 @@ class SlotsCog(commands.Cog):
             if info and amt > 0:
                 breakdown.append(f"Col {c+1}: {info}")
 
-        # Apply board multipliers
+        # Multipliers anywhere multiply TOTAL (stacking)
         mults = [it.multiplier for row in grid for it in row if it.is_multiplier and it.multiplier > 1]
         mult_product = 1
         for m in mults:
             mult_product *= m
-
         mult_used = mult_product > 1
         total *= mult_product
 
         return grid, total, breakdown, mult_used
 
-    # ---- Channel message (embed) ----
+    # ---------------- Persistent channel message ----------------
 
     async def _compose_main_embed(self) -> discord.Embed:
         await self._ensure_config_for_today()
         assert self._config is not None
         cfg = self._config
 
-        # Leaderboard top N
+        # Top by total winnings
         top = await self.r.zrevrange(K_LEADERBOARD, 0, LEADERBOARD_LEN - 1, withscores=True)
+
         lb_lines: List[str] = []
         if top:
+            # Fetch spins & winnings hashes in one go
+            spins_map = await self.r.hgetall(K_STATS_SPINS)
+            win_map = await self.r.hgetall(K_STATS_WINNINGS)
             for i, (uid_str, score) in enumerate(top, start=1):
                 uid = int(uid_str)
-                lb_lines.append(f"`{i:>2}.` <@{uid}> — **{int(score):,}**")
+                spins = int(spins_map.get(uid_str, "0"))
+                total_wins = int(win_map.get(uid_str, str(int(score))))  # fallback to zset score if hash missing
+                avg = (total_wins / spins) if spins > 0 else 0.0
+                lb_lines.append(f"`{i:>2}.` <@{uid}> — **{total_wins:,}** | spins: **{spins}** | avg: **{avg:.2f}**")
         else:
             lb_lines.append("_No entries yet._")
 
@@ -391,14 +399,13 @@ class SlotsCog(commands.Cog):
         return embed
 
     async def _refresh_channel_message(self):
-        # Re-render main embed and edit the tracked message, if available
         msg_id = await self.r.get(K_MESSAGE_ID)
         chan_id = await self.r.get(K_CHANNEL_ID)
         if not (msg_id and chan_id):
             return
 
         channel = self.bot.get_channel(int(chan_id))
-        if not isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
+        if not isinstance(channel, (discord.TextChannel, discord.Thread)):
             return
 
         try:

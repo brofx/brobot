@@ -1,6 +1,6 @@
 {
   "title": "BRFX Spin2Win",
-  "instructions": "Press **Spin** to roll a 5×5 board. Rows/Cols with 3+ matching symbols (wilds substitute) pay their base value × match count. Any multiplier anywhere multiplies the total (stacking). You get **3 spins per day** (resets at midnight ET). Big wins are logged to the feed. Good luck!",
+  "instructions": "Press **Spin** to roll a 5×5 board. Rows/Cols with 3+ matching symbols (wilds substitute) pay base value × match count. Any multiplier anywhere multiplies the total (stacking). You get **5 spins per day** (resets at midnight ET). Big wins are logged to the feed. Good luck!",
   "big_win_threshold": 5000,
   "items": [
     { "key": "wild", "emoji": "🃏", "weight": 4, "base_value": 50, "is_wild": true },
@@ -13,12 +13,12 @@
     { "key": "gem",    "emoji": "💎", "weight": 6,  "base_value": 100 },
     { "key": "seven",  "emoji": "7️⃣", "weight": 4,  "base_value": 150 },
 
-    { "key": "m2",    "emoji": "✖️2", "weight": 5,  "base_value": 0, "is_multiplier": true, "multiplier": 2 },
-    { "key": "m5",    "emoji": "✖️5", "weight": 2.5,"base_value": 0, "is_multiplier": true, "multiplier": 5 },
-    { "key": "m10",   "emoji": "✖️10","weight": 1.2,"base_value": 0, "is_multiplier": true, "multiplier": 10 },
-    { "key": "m25",   "emoji": "✖️25","weight": 0.5,"base_value": 0, "is_multiplier": true, "multiplier": 25 },
-    { "key": "m50",   "emoji": "✖️50","weight": 0.2,"base_value": 0, "is_multiplier": true, "multiplier": 50 },
-    { "key": "m100",  "emoji": "✖️100","weight": 0.08,"base_value": 0, "is_multiplier": true, "multiplier": 100 },
-    { "key": "m1000", "emoji": "✖️1000","weight": 0.01,"base_value": 0, "is_multiplier": true, "multiplier": 1000 }
+    { "key": "m2",    "emoji": "✖️2",   "weight": 5,    "base_value": 0, "is_multiplier": true, "multiplier": 2 },
+    { "key": "m5",    "emoji": "✖️5",   "weight": 2.5,  "base_value": 0, "is_multiplier": true, "multiplier": 5 },
+    { "key": "m10",   "emoji": "✖️10",  "weight": 1.2,  "base_value": 0, "is_multiplier": true, "multiplier": 10 },
+    { "key": "m25",   "emoji": "✖️25",  "weight": 0.5,  "base_value": 0, "is_multiplier": true, "multiplier": 25 },
+    { "key": "m50",   "emoji": "✖️50",  "weight": 0.2,  "base_value": 0, "is_multiplier": true, "multiplier": 50 },
+    { "key": "m100",  "emoji": "✖️100", "weight": 0.08, "base_value": 0, "is_multiplier": true, "multiplier": 100 },
+    { "key": "m1000", "emoji": "✖️1000","weight": 0.01, "base_value": 0, "is_multiplier": true, "multiplier": 1000 }
   ]
 }

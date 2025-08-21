@@ -141,6 +141,7 @@ class ResultShareView(discord.ui.View):
         share_description: str,
         grid_str: str,
         color: discord.Color,
+        spin_time: str,
     ):
         super().__init__(timeout=180)
         self.bot = bot
@@ -150,6 +151,7 @@ class ResultShareView(discord.ui.View):
         self.share_description = share_description
         self.grid_str = grid_str
         self.color = color
+        self.spin_time = spin_time
 
     @discord.ui.button(label="📣 Share to thread", style=discord.ButtonStyle.secondary, custom_id="slots:share_result")
     async def share(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -174,6 +176,7 @@ class ResultShareView(discord.ui.View):
             color=self.color
         )
         embed.add_field(name="Summary", value=self.grid_str, inline=False)
+        embed.set_footer(text=self.spin_time)
 
         try:
             await channel.send(content=f"Spin by <@{self.author_id}>", embed=embed)
@@ -395,6 +398,8 @@ class SlotsCog(commands.Cog):
         grid, spin_total, breakdown, mult_used, grid_mult, total_mult = self._spin_and_score(
             cfg, bonus_multiplier=bonus_mult, size=board_size
         )
+        # %-I to remove the leading zero is unix specific, %#I works on windows.
+        spin_time = datetime.now(tz=NY_TZ).strftime("%B %d, %Y at %-I:%M %p %Z")
 
         # --- Progressive Jackpot check (applies to ALL spins) ---
         jackpot_award = 0
@@ -486,10 +491,11 @@ class SlotsCog(commands.Cog):
             description=grid_str,
             color=discord.Color.orange() if mega else (discord.Color.green() if net_delta > 0 else discord.Color.dark_gray())
         )
-
-        embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
         if jackpot_award > 0:
             desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:,}")
+        
+        embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
+        embed.set_footer(text=spin_time)
 
         view = ResultShareView(
             bot=self.bot,
@@ -498,7 +504,8 @@ class SlotsCog(commands.Cog):
             share_title=title,
             share_description=grid_str,
             grid_str="\n".join(desc_lines),
-            color=embed.color
+            color=embed.color,
+            spin_time=spin_time
         )
 
         if interaction.response.is_done():

@@ -96,7 +96,6 @@ class RandomizeCards(commands.Cog):
             description=(
                 f"Event: `{event_slug}`\n"
                 f"Players: **{count}**\n"
-                f"Smaller groups appear first."
             ),
             url=url,
             color=color,
@@ -109,7 +108,7 @@ class RandomizeCards(commands.Cog):
         # Compute groups and add fields
         groups = group_participants(participants)
         for i, group in enumerate(groups, start=1):
-            name = f"Card {i} (size {len(group)})"
+            name = f"Card {i}"
             # Each field value max 1024 chars; join with newlines
             value_lines = []
             for p in group:

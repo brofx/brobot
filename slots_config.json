@@ -10,7 +10,7 @@
 
     { "key": "lemon",  "emoji_id": 763061696439910450, "emoji_name": "wtfJOE", "emoji_animated": false, "weight": 30, "base_value": 5 },
     { "key": "gem",    "emoji_id": 750892648755232789, "emoji_name": "catJAM", "emoji_animated": true, "weight": 3,  "base_value": 300 },
-    { "key": "seven",  "emoji_id": 750892648948039781, "emoji_name": "catRAVE", "emoji_animated": true, "weight": 2,  "base_value": 500 },
+    { "key": "seven",  "emoji_id": 750892648948039781, "emoji_name": "catRAVE", "emoji_animated": true, "weight": 2,  "base_value": 400 },
 
     { "key": "scott",  "emoji_id": 385598623997755392, "emoji_name": "scott", "emoji_animated": false, "weight": 5,  "base_value": 69 },
     { "key": "pelly",  "emoji_id": 385599722792157184, "emoji_name": "pelly", "emoji_animated": false, "weight": 5,  "base_value": 69 },
@@ -25,19 +25,20 @@
 
     { "key": "felix",  "emoji_id": 1175215017348575283, "emoji_name": "Felix", "emoji_animated": false, "weight": 7,  "base_value": 123 },
     { "key": "otter",  "emoji_id": 1175214232900468786, "emoji_name": "otter_blep", "emoji_animated": false, "weight": 7,  "base_value": 123 },
-    { "key": "cassie",  "emoji_id": 385929891004153856, "emoji_name": "aww_cassie", "emoji_animated": false, "weight": 7,  "base_value": 123 },
-    { "key": "nuckie",  "emoji_id": 274720877646577675, "emoji_name": "Nook", "emoji_animated": false, "weight": 7,  "base_value": 123 },
-    { "key": "sami",  "emoji_id": 274721157192876032, "emoji_name": "Sami", "emoji_animated": false, "weight": 7,  "base_value": 123 },
-    { "key": "maple",  "emoji_id": 738419483302952980, "emoji_name": "maple2", "emoji_animated": false, "weight": 7,  "base_value": 123 },
     { "key": "murph",  "emoji_id": 435942362120716298, "emoji_name": "murph", "emoji_animated": false, "weight": 7,  "base_value": 123 },
-    { "key": "bandit",  "emoji_id": 385593361681088523, "emoji_name": "bandit", "emoji_animated": false, "weight": 7,  "base_value": 123 },
+    { "key": "nuckie",  "emoji_id": 274720877646577675, "emoji_name": "Nook", "emoji_animated": false, "weight": 7,  "base_value": 123 },
+    { "key": "maple",  "emoji_id": 738419483302952980, "emoji_name": "maple2", "emoji_animated": false, "weight": 7,  "base_value": 123 },
+    
+    { "key": "sami",  "emoji_id": 274721157192876032, "emoji_name": "Sami", "emoji_animated": false, "weight": 1,  "base_value": 500 },
+    { "key": "bandit",  "emoji_id": 385593361681088523, "emoji_name": "bandit", "emoji_animated": false, "weight": 1,  "base_value": 500 },
+    { "key": "cassie",  "emoji_id": 385929891004153856, "emoji_name": "aww_cassie", "emoji_animated": false, "weight": 1,  "base_value": 500 },
 
     { "key": "m2",    "emoji_id": 1407887874829058169, "emoji_name": "multi2", "emoji_animated": false,  "weight": 5,    "base_value": 0, "is_multiplier": true, "multiplier": 2 },
-    { "key": "m5",    "emoji_id": 1407888377189105995, "emoji_name": "multi5", "emoji_animated": false,   "weight": 2.5,  "base_value": 0, "is_multiplier": true, "multiplier": 5 },
-    { "key": "m10",   "emoji_id": 1407888665044189224, "emoji_name": "multi10", "emoji_animated": false,  "weight": 1.2,  "base_value": 0, "is_multiplier": true, "multiplier": 10 },
-    { "key": "m25",   "emoji_id": 1407887742356029511, "emoji_name": "multi25", "emoji_animated": false,  "weight": 0.5,  "base_value": 0, "is_multiplier": true, "multiplier": 25 },
-    { "key": "m50",   "emoji_id": 1407889801985785876, "emoji_name": "multi50", "emoji_animated": false,  "weight": 0.2,  "base_value": 0, "is_multiplier": true, "multiplier": 50 },
-    { "key": "m100",  "emoji_id": 1407889564785184829, "emoji_name": "multi100", "emoji_animated": false, "weight": 0.08, "base_value": 0, "is_multiplier": true, "multiplier": 100 },
-    { "key": "m1000", "emoji_id": 1407889561723343011, "emoji_name": "multi1000", "emoji_animated": false,"weight": 0.01, "base_value": 0, "is_multiplier": true, "multiplier": 1000 }
+    { "key": "m5",    "emoji_id": 1407888377189105995, "emoji_name": "multi5", "emoji_animated": false,   "weight": 3.5,  "base_value": 0, "is_multiplier": true, "multiplier": 5 },
+    { "key": "m10",   "emoji_id": 1407888665044189224, "emoji_name": "multi10", "emoji_animated": false,  "weight": 2.2,  "base_value": 0, "is_multiplier": true, "multiplier": 10 },
+    { "key": "m25",   "emoji_id": 1407887742356029511, "emoji_name": "multi25", "emoji_animated": false,  "weight": 1.1,  "base_value": 0, "is_multiplier": true, "multiplier": 25 },
+    { "key": "m50",   "emoji_id": 1407889801985785876, "emoji_name": "multi50", "emoji_animated": false,  "weight": 0.5,  "base_value": 0, "is_multiplier": true, "multiplier": 50 },
+    { "key": "m100",  "emoji_id": 1407889564785184829, "emoji_name": "multi100", "emoji_animated": false, "weight": 0.1, "base_value": 0, "is_multiplier": true, "multiplier": 100 },
+    { "key": "m1000", "emoji_id": 1407889561723343011, "emoji_name": "multi1000", "emoji_animated": false,"weight": 0.03, "base_value": 0, "is_multiplier": true, "multiplier": 1000 }
   ]
 }

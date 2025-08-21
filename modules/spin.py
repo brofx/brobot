@@ -25,7 +25,7 @@ import os
 import json
 import random
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, time as dtime
 from typing import Any, Dict, List, Optional, Tuple
 import time
 import logging
@@ -99,6 +99,12 @@ def plays_key(user_id: int, date_str: Optional[str] = None) -> str:
     if date_str is None:
         date_str = ny_date_str()
     return f"slots:plays:{date_str}:{user_id}"
+
+def next_midnight_et_epoch() -> int:
+    now = datetime.now(NY_TZ)
+    next_day = (now + timedelta(days=1)).date()
+    next_midnight = datetime.combine(next_day, dtime(0, 0, 0), tzinfo=NY_TZ)
+    return int(next_midnight.timestamp())
 
 @dataclass
 class Item:
@@ -1105,20 +1111,20 @@ class SlotsCog(commands.Cog):
         else:
             feed_lines.append("_No big wins yet._")
 
-        last_cfg_date = await self.r.get(K_CONFIG_DATE)
+        # last_cfg_date = await self.r.get(K_CONFIG_DATE)
         pool_val = int(await self.r.get(K_JACKPOT_POOL) or 0)
         embed = discord.Embed(
             title=f"{cfg.title} — Daily limit: {MEGA_SPINS_PER_DAY} MEGA spins/user",
             description=cfg.instructions,
-            color=discord.Color.gold()
+            color=discord.Color.gold(),
+            timestamp=datetime.now(tz=NY_TZ)
         )
-        
-        embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_val:,}\n**+0.5%** per normal spin", inline=True)
+        reset_ts = next_midnight_et_epoch()
+        embed.add_field(name="Next MEGA reset", value=f"<t:{reset_ts}:R>", inline=False)        
+        embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_val:,}\n**+0.5%** per normal spin", inline=False)
         embed.add_field(name=f"Leaderboard (Top {LEADERBOARD_LEN})", value="\n".join(lb_lines), inline=False)
         embed.add_field(name=f"Biggest Spins (Top {BIGGEST_SPINS_LEN})", value="\n".join(big_lines), inline=False)
         embed.add_field(name="Recent Big Wins", value="\n".join(feed_lines), inline=False)
-        if last_cfg_date:
-            embed.set_footer(text=f"Config last loaded for: {last_cfg_date} (ET)")
         return embed
 
     async def _refresh_channel_message(self):

@@ -478,6 +478,7 @@ class SlotsCog(commands.Cog):
         if breakdown:
             desc_lines += [f"- {line}" for line in breakdown]
 
+        desc_lines.append(f"**Total multiplier:** ×{total_mult:g}")
         desc_lines.append(f"**Your totals:** spins={total_spins}, points={total_wins_accum:,}, avg/spin={avg:.2f}")
 
         embed = discord.Embed(
@@ -485,7 +486,6 @@ class SlotsCog(commands.Cog):
             description="\n".join(desc_lines),
             color=discord.Color.orange() if mega else (discord.Color.green() if net_delta > 0 else discord.Color.dark_gray())
         )
-        embed.add_field(name="Total multiplier", value=f"×{total_mult:g}", inline=True)
         embed.add_field(name="Grid", value=grid_str, inline=False)
         if jackpot_award > 0:
             desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:,}")

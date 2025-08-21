@@ -40,7 +40,7 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 SHARE_THREAD_ID = int(os.getenv("SLOTS_SHARE_THREAD_ID", "1407752230425067653"))  # Target thread id for sharing spin results
 CONFIG_PATH = os.getenv("SLOTS_CONFIG_PATH", "slots_config.json")
-DAILY_SPINS = 5
+
 BIGWINS_FEED_LEN = 20
 LEADERBOARD_LEN = 10
 COOLDOWN_SECONDS = 300  # 5 minutes
@@ -50,7 +50,7 @@ MEGA_COST_FRACTION = 0.10
 MEGA_PAYOUT_MULT = 3.0  # global multiplier applied to the spin total when using MEGA
 JACKPOT_MIN_MATCHES = 20
 COOLDOWN_SECONDS = 300  # 5 minutes
-NORMAL_TOKENS_CAP = 3   # up to 3 stored normal spins
+NORMAL_TOKENS_CAP = 5   # up to 5 stored normal spins
 
 # Redis keys
 K_MESSAGE_ID = "slots:message_id"
@@ -479,7 +479,7 @@ class SlotsCog(commands.Cog):
             desc_lines += [f"- {line}" for line in breakdown]
 
         desc_lines.append(f"**Total multiplier:** ×{total_mult:g}")
-        desc_lines.append(f"**Your totals:** spins={total_spins}, points={total_wins_accum:,}, avg/spin={avg:.2f}")
+        desc_lines.append(f"**Your totals:** spins={total_spins}, points={total_wins_accum:,}, avg/spin={avg:,.2f}")
 
         embed = discord.Embed(
             title=title,
@@ -709,7 +709,7 @@ class SlotsCog(commands.Cog):
                 spins = int(spins_map.get(uid_str, "0"))
                 total_wins = int(win_map.get(uid_str, str(int(score))))  # fallback to zset score if hash missing
                 avg = (total_wins / spins) if spins > 0 else 0.0
-                lb_lines.append(f"`{i:>2}.` <@{uid}> — **{total_wins:,}** | spins: **{spins}** | avg: **{avg:.2f}**")
+                lb_lines.append(f"`{i:>2}.` <@{uid}> — **{total_wins:,}** | spins: **{spins}** | avg: **{avg:,.2f}**")
         else:
             lb_lines.append("_No entries yet._")
 

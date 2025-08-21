@@ -784,7 +784,7 @@ class SlotsCog(commands.Cog):
             big_lines.append("_No spins recorded yet._")
 
         # Big wins feed (most recent first)
-        feed_raw = await self.r.lrange(K_BIGWINS, 0, 9)
+        feed_raw = await self.r.lrange(K_BIGWINS, 0, BIGWINS_FEED_LEN-1)
         feed_lines: List[str] = []
         if feed_raw:
             for s in feed_raw:

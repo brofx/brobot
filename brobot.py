@@ -7,6 +7,7 @@ from discord.ext import commands
 
 import logging
 discord.utils.setup_logging(level=logging.INFO, root=True)
+logger = logging.getLogger(__name__)
 
 discord_key: str = os.getenv("DISCORD_KEY")
 
@@ -33,8 +34,9 @@ class Brobot(commands.Bot):
         await self.init_bot()
 
     async def on_ready(self):
-        print(f'\n\nLogged in as: {self.user.name} - {self.user.id}\nVersion: {discord.__version__}\n')
-        print(f'Successfully logged in and booted...!')
+        logger.info(f'Logged in as: {self.user.name} - {self.user.id}')
+        logger.info(f'Version: {discord.__version__}')
+        logger.info(f'Successfully logged in and booted...!')
 
     async def close(self):
         await super().close()
@@ -44,9 +46,9 @@ class Brobot(commands.Bot):
         for module in brobot_modules:
             try:
                 await self.load_extension(module)
-                print("Loaded: {}".format(module))
+                logger.info("Loaded: {}".format(module))
             except commands.ExtensionError as error:
-                print("Error loading {}: {}".format(module, error))
+                logger.error(f"Error loading {module}: %s", error, exc_info=True)
 
 
 if __name__ == '__main__':
@@ -54,7 +56,7 @@ if __name__ == '__main__':
         print("You must set the DISCORD_KEY env variable.")
         exit()
     bot = Brobot()
-    bot.run(discord_key)
+    bot.run(discord_key, log_handler=None)
 else:
     print("This class is not meant to be imported.")
     exit()

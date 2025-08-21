@@ -467,9 +467,9 @@ class SlotsCog(commands.Cog):
             tok_left, next_in = await self._refill_normal_tokens(user.id)
             if tok_left < NORMAL_TOKENS_CAP and next_in > 0:
                 mins, secs = divmod(next_in, 60)
-                desc_lines.append(f"**Normal spins:** {tok_left}/{NORMAL_TOKENS_CAP} (next in {mins}m {secs}s)")
+                desc_lines.append(f"**Remaining spins:** {tok_left}/{NORMAL_TOKENS_CAP} (+1 in {mins}m {secs}s)")
             else:
-                desc_lines.append(f"**Normal spins:** {tok_left}/{NORMAL_TOKENS_CAP}")
+                desc_lines.append(f"**Remaining spins:** {tok_left}/{NORMAL_TOKENS_CAP}")
         else:
             # MEGA info block
             used_after = int(await self.r.get(mega_plays_key(user.id, date_str)) or 0)
@@ -483,7 +483,7 @@ class SlotsCog(commands.Cog):
         if breakdown:
             desc_lines += [f"- {line}" for line in breakdown]
 
-        desc_lines.append(f"**Total multiplier:** ×{total_mult:g}")
+        desc_lines.append(f"**Total multiplier:** {total_mult:g}×")
         desc_lines.append(f"**Your totals:** spins={total_spins}, points={total_wins_accum:,}, avg/spin={avg:,.2f}")
 
         embed = discord.Embed(

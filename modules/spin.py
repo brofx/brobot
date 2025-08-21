@@ -371,6 +371,15 @@ class SlotsCog(commands.Cog):
                 )
             # consume one token
             await self.r.decr(K_NORMAL_TOKENS.format(user_id=user.id))
+
+            # Increase jackpot by 1%
+            try:
+                jackpot_award = int(await self.r.get(K_JACKPOT_POOL))
+            except Exception:
+                jackpot_award = 0
+
+            if jackpot_award > 0:
+                await self.r.set(K_JACKPOT_POOL, int(jackpot_award * 1.01))
         else:
             # MEGA spin: enforce per-day count and cost
             mkey = mega_plays_key(user.id, date_str)

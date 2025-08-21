@@ -16,6 +16,11 @@
 # - The Spin button uses interactions and returns an ephemeral result to prevent channel spam.
 # - Persistent views survive restarts via bot.add_view(SlotsSpinView()) in cog_load().
 
+# Saved for future use maybe
+# { "key": "badscott",  "emoji_id": 761669328356507658, "emoji_name": "scuffedBabish", "emoji_animated": false, "weight": 5,  "base_value": 15 },
+# { "key": "badmark",  "emoji_id": 806942508268519444, "emoji_name": "kawaii", "emoji_animated": false, "weight": 5,  "base_value": 15 },
+# { "key": "badpelly",  "emoji_id": 806605653510193162, "emoji_name": "hitormiss", "emoji_animated": false, "weight": 5,  "base_value": 15 },
+
 import os
 import json
 import random
@@ -50,7 +55,7 @@ COOLDOWN_SECONDS = 300  # 5 minutes
 MEGA_SPINS_PER_DAY = 3
 MEGA_MIN_POINTS = 1000
 MEGA_COST_FRACTION = 0.10
-MEGA_PAYOUT_MULT = 3.0  # global multiplier applied to the spin total when using MEGA
+MEGA_PAYOUT_MULT = 3.69  # global multiplier applied to the spin total when using MEGA
 JACKPOT_MIN_MATCHES = 20
 COOLDOWN_SECONDS = 300  # 5 minutes
 NORMAL_TOKENS_CAP = 5   # up to 5 stored normal spins

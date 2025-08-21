@@ -354,6 +354,8 @@ class SlotsCog(commands.Cog):
 
         user = interaction.user
         user_id = str(user.id)
+        spin_time = datetime.now(tz=NY_TZ)
+        spin_time_utc_sec = int(spin_time.timestamp())
         date_str = ny_date_str()
 
         # NORMAL spin: enforce cooldown
@@ -361,9 +363,9 @@ class SlotsCog(commands.Cog):
             # token-bucket check
             tokens, next_in = await self._refill_normal_tokens(user.id)
             if tokens <= 0:
-                mins, secs = divmod(next_in, 60)
+                #mins, secs = divmod(next_in, 60)
                 return await interaction.response.send_message(
-                    f"No normal spins available. Next charge in **{mins}m {secs}s** "
+                    f"No normal spins available. Next charge in **<t:{spin_time_utc_sec + next_in}:R>** "
                     f"(you can store up to **{NORMAL_TOKENS_CAP}**).",
                     ephemeral=True
                 )
@@ -407,7 +409,7 @@ class SlotsCog(commands.Cog):
             cfg, bonus_multiplier=bonus_mult, size=board_size
         )
         # %-I to remove the leading zero is unix specific, %#I works on windows.
-        spin_time = datetime.now(tz=NY_TZ)
+        
         spin_time_str = spin_time.strftime("%B %d, %Y at %-I:%M %p %Z")
 
         # --- Progressive Jackpot check (applies to ALL spins) ---
@@ -477,8 +479,8 @@ class SlotsCog(commands.Cog):
             # show remaining tokens and next refill
             tok_left, next_in = await self._refill_normal_tokens(user.id)
             if tok_left < NORMAL_TOKENS_CAP and next_in > 0:
-                mins, secs = divmod(next_in, 60)
-                desc_lines.append(f"**Remaining spins:** {tok_left}/{NORMAL_TOKENS_CAP} (+1 in {mins}m {secs}s)")
+                # mins, secs = divmod(next_in, 60)
+                desc_lines.append(f"**Remaining spins:** {tok_left}/{NORMAL_TOKENS_CAP} (+1 <t:{spin_time_utc_sec + next_in}:R>)")
             else:
                 desc_lines.append(f"**Remaining spins:** {tok_left}/{NORMAL_TOKENS_CAP}")
         else:

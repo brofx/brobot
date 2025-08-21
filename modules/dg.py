@@ -31,7 +31,8 @@ try:
     from zoneinfo import ZoneInfo  # Python 3.9+
 except Exception:
     ZoneInfo = None  # type: ignore
-
+import logging
+logger = logging.getLogger(__name__)
 
 EMBED_COLOR_DEFAULT = discord.Color.blurple()
 EMBED_COLOR_UPCOMING = discord.Color.green()
@@ -46,6 +47,7 @@ class RandomizeCards(commands.Cog):
         self.league_slug = league_slug
         self.timezone = timezone
         # Reuse the scraper with the same timezone logic.
+        logger.info("Setting up")
         self.league = DiscGolfLeague(league_slug, timezone=timezone)
 
     # --------------- Helpers ---------------
@@ -119,6 +121,7 @@ class RandomizeCards(commands.Cog):
 
     # --------------- Command ---------------
     @commands.command(name="randomize_cards")
+    @commands.guild_only()
     async def randomize_cards(self, ctx: commands.Context, event_slug: Optional[str] = None):
         """Randomly group participants for an event into cards (groups).
 

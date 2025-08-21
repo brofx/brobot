@@ -367,8 +367,8 @@ class SlotsCog(commands.Cog):
             if tokens <= 0:
                 #mins, secs = divmod(next_in, 60)
                 return await interaction.response.send_message(
-                    f"No normal spins available. Next spin **<t:{spin_time_utc_sec + next_in}:R>** "
-                    f"(you can store up to **{NORMAL_TOKENS_CAP}**).",
+                    f"No normal spins available. Next spin available: **<t:{spin_time_utc_sec + next_in}:R>** "
+                    f"\n(you can store up to **{NORMAL_TOKENS_CAP}**).",
                     ephemeral=True
                 )
             # consume one token
@@ -808,7 +808,7 @@ class SlotsCog(commands.Cog):
             color=discord.Color.gold()
         )
         
-        embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_val:,}", inline=True)
+        embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_val:,}\n**+0.5%** per normal spin", inline=True)
         embed.add_field(name=f"Leaderboard (Top {LEADERBOARD_LEN})", value="\n".join(lb_lines), inline=False)
         embed.add_field(name=f"Biggest Spins (Top {BIGGEST_SPINS_LEN})", value="\n".join(big_lines), inline=False)
         embed.add_field(name="Recent Big Wins", value="\n".join(feed_lines), inline=False)

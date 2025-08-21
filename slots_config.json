@@ -25,12 +25,12 @@
     { "key": "tom",  "emoji_id": 789918349370720257, "emoji_name": "tom", "emoji_animated": false, "weight": 5,  "base_value": 69 },
     { "key": "alex",  "emoji_id": 385600793870467082, "emoji_name": "dtoes", "emoji_animated": false, "weight": 5,  "base_value": 69 },
 
-    { "key": "m2",    "emoji": "✖️2",   "weight": 5,    "base_value": 0, "is_multiplier": true, "multiplier": 2 },
-    { "key": "m5",    "emoji": "✖️5",   "weight": 2.5,  "base_value": 0, "is_multiplier": true, "multiplier": 5 },
-    { "key": "m10",   "emoji": "✖️10",  "weight": 1.2,  "base_value": 0, "is_multiplier": true, "multiplier": 10 },
-    { "key": "m25",   "emoji": "✖️25",  "weight": 0.5,  "base_value": 0, "is_multiplier": true, "multiplier": 25 },
-    { "key": "m50",   "emoji": "✖️50",  "weight": 0.2,  "base_value": 0, "is_multiplier": true, "multiplier": 50 },
-    { "key": "m100",  "emoji": "✖️100", "weight": 0.08, "base_value": 0, "is_multiplier": true, "multiplier": 100 },
-    { "key": "m1000", "emoji": "✖️1000","weight": 0.01, "base_value": 0, "is_multiplier": true, "multiplier": 1000 }
+    { "key": "m2",    "emoji_id": 1407887874829058169, "emoji_name": "multi2", "emoji_animated": false,  "weight": 5,    "base_value": 0, "is_multiplier": true, "multiplier": 2 },
+    { "key": "m5",    "emoji_id": 1407888377189105995, "emoji_name": "multi5", "emoji_animated": false,   "weight": 2.5,  "base_value": 0, "is_multiplier": true, "multiplier": 5 },
+    { "key": "m10",   "emoji_id": 1407888665044189224, "emoji_name": "multi10", "emoji_animated": false,  "weight": 1.2,  "base_value": 0, "is_multiplier": true, "multiplier": 10 },
+    { "key": "m25",   "emoji_id": 1407887742356029511, "emoji_name": "multi25", "emoji_animated": false,  "weight": 0.5,  "base_value": 0, "is_multiplier": true, "multiplier": 25 },
+    { "key": "m50",   "emoji_id": 1407889801985785876, "emoji_name": "multi50", "emoji_animated": false,  "weight": 0.2,  "base_value": 0, "is_multiplier": true, "multiplier": 50 },
+    { "key": "m100",  "emoji_id": 1407889564785184829, "emoji_name": "multi100", "emoji_animated": false, "weight": 0.08, "base_value": 0, "is_multiplier": true, "multiplier": 100 },
+    { "key": "m1000", "emoji_id": 1407889561723343011, "emoji_name": "multi1000", "emoji_animated": false,"weight": 0.01, "base_value": 0, "is_multiplier": true, "multiplier": 1000 }
   ]
 }

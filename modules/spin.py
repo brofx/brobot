@@ -212,6 +212,10 @@ class DuelAcceptView(discord.ui.View):
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.cog.accept_duel(interaction, self)
 
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger, custom_id="slots:duel:cancel")
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.cancel_duel(interaction, self)
+
 class ResultShareView(discord.ui.View):
     def __init__(
         self,
@@ -871,6 +875,59 @@ class SlotsCog(commands.Cog):
         except Exception:
             try:
                 await interaction.followup.send("1v1 resolved — results posted.", ephemeral=True)
+            except Exception:
+                pass
+
+    async def cancel_duel(self, interaction: discord.Interaction, view: "DuelAcceptView"):
+        # Only the initiator can cancel
+        if interaction.user.id != view.initiator_id:
+            return await interaction.response.send_message("Only the challenger can cancel this 1v1.", ephemeral=True)
+
+        # Acquire same lock used by accept to prevent races
+        lock_key = K_DUEL_LOCK.format(message_id=view.message_id)
+        if not await self.r.set(lock_key, "1", ex=DUEL_TIMEOUT_SECONDS, nx=True):
+            return await interaction.response.send_message("This 1v1 was already accepted or closed.", ephemeral=True)
+
+        data = await self.r.get(view.duel_key)
+        if not data:
+            return await interaction.response.send_message("This 1v1 is no longer active.", ephemeral=True)
+        obj = json.loads(data)
+        if obj.get("state") != "open":
+            return await interaction.response.send_message("This 1v1 was already accepted or closed.", ephemeral=True)
+
+        # Mark cancelled & refund initiator's fee
+        obj["state"] = "cancelled"
+        await self.r.set(view.duel_key, json.dumps(obj), ex=60)
+
+        uid = str(view.initiator_id)
+        fee = int(obj.get("initiator_fee", view.initiator_fee))
+        pipe = self.r.pipeline()
+        pipe.hincrby(K_STATS_WINNINGS, uid, fee)
+        pipe.zincrby(K_LEADERBOARD, fee, uid)
+        pipe.hdel(K_DUEL_ACTIVE_BY_USER, uid)
+        pipe.delete(view.duel_key)
+        await pipe.execute()
+
+        # Disable buttons and delete the challenge message (it also had delete_after, but remove now to de-clutter)
+        for item in view.children:
+            item.disabled = True
+        try:
+            if interaction.message:
+                await interaction.message.delete()
+            else:
+                ch = self.bot.get_channel(view.channel_id) or await self.bot.fetch_channel(view.channel_id)
+                if isinstance(ch, (discord.TextChannel, discord.Thread)):
+                    msg = await ch.fetch_message(view.message_id)
+                    await msg.delete()
+        except Exception:
+            pass
+
+        # Ack
+        try:
+            await interaction.response.send_message("1v1 cancelled. Your fee was refunded.", ephemeral=True)
+        except Exception:
+            try:
+                await interaction.followup.send("1v1 cancelled. Your fee was refunded.", ephemeral=True)
             except Exception:
                 pass
 

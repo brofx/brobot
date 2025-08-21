@@ -4,7 +4,7 @@ aiosignal==1.4.0
 async-timeout==4.0.3
 attrs==24.2.0
 audioop-lts==0.2.2
-beautifulsoup4==4.12.3
+beautifulsoup4==4.13.4
 certifi==2024.8.30
 charset-normalizer==3.3.2
 discord.py==2.6.0

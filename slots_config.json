@@ -3,7 +3,7 @@
   "instructions": "Press **Spin** for a normal play (5×5 board). Rows/Cols with **3+ matching symbols** pay **base value × match count**; <:Brofox:274720106129653767> wilds substitute. Any ✖️ multipliers anywhere on the board **stack and multiply your total**.\n\n**Normal Spins:** 1 spin every **5 minutes** per user (stacks up to 5).\n\n**💥 MEGA Spins:** **3 per day**, reset at **midnight ET (America/New_York)**. Requires **> 1,000 points** and costs **10% of your current points** up front. MEGA spins grant **boosted payouts** (on top of in-grid multipliers). The result shown is your **net change** (gross win − cost).\n\nGood luck!",
   "big_win_threshold": 100000,
   "items": [
-    { "key": "wild", "emoji_id": 274720106129653767, "emoji_name": "Brofox", "emoji_animated": false, "weight": 5, "base_value": 150, "is_wild": true },
+    { "key": "wild", "emoji_id": 1408107455237586964, "emoji_name": "brfx_shiny", "emoji_animated": false, "weight": 5, "base_value": 150, "is_wild": true },
 
     { "key": "sumpunch",  "emoji_id": 533090405970083860, "emoji_name": "sumpunch", "emoji_animated": true, "weight": 6, "base_value": 99 },
     { "key": "huh",  "emoji_id": 733036348298100776, "emoji_name": "huh", "emoji_animated": true, "weight": 4, "base_value": 200 },

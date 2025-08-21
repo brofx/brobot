@@ -534,7 +534,7 @@ class SlotsCog(commands.Cog):
         return None
 
     def _render_grid(self, grid: List[List[Item]]) -> str:
-        return "\n".join(" ".join(cell.token() for cell in row) for row in grid)
+        return "\n".join("# " + " ".join(cell.token() for cell in row) for row in grid)
 
     def _spin_and_score(self, cfg: SlotsConfig, *, bonus_multiplier: float = 1.0) -> Tuple[List[List[Item]], int, List[str], bool]:
         population = cfg.items

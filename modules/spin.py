@@ -49,7 +49,7 @@ REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 SHARE_THREAD_ID = int(os.getenv("SLOTS_SHARE_THREAD_ID", "1407752230425067653"))  # Target thread id for sharing spin results
 CONFIG_PATH = os.getenv("SLOTS_CONFIG_PATH", "slots_config.json")
 
-BIGWINS_FEED_LEN = 20
+BIGWINS_FEED_LEN = 10
 LEADERBOARD_LEN = 10
 COOLDOWN_SECONDS = 300  # 5 minutes
 MEGA_SPINS_PER_DAY = 3
@@ -457,6 +457,7 @@ class SlotsCog(commands.Cog):
                 "username": user_name,
                 "amount": net_delta,
                 "date": date_str,
+                "utc_sec": spin_time_utc_sec,
                 "mega": mega,
                 "jackpot": jackpot_award
             }
@@ -751,7 +752,11 @@ class SlotsCog(commands.Cog):
             for s in feed_raw:
                 try:
                     obj = json.loads(s)
-                    feed_lines.append(f"🎉 <@{obj['user_id']}> won **{int(obj['amount']):,}** on {obj.get('date', '')}")
+                    if "utc_sec" in obj:
+                        feed_timestamp = f"<t:{obj["utc_sec"]}:R>"
+                    else:
+                        feed_timestamp = f"on {obj.get('date', '')}"
+                    feed_lines.append(f"🎉 <@{obj['user_id']}> won **{int(obj['amount']):,}** {feed_timestamp}")
                 except Exception:
                     continue
         else:

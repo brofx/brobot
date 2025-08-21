@@ -60,6 +60,8 @@ JACKPOT_MIN_MATCHES = 20
 COOLDOWN_SECONDS = 300  # 5 minutes
 NORMAL_TOKENS_CAP = 5   # up to 5 stored normal spins
 BIGGEST_SPINS_LEN = 5
+DUEL_TIMEOUT_SECONDS = 300
+DUEL_FEE_FRACTION = 0.05  # 5%
 
 # Redis keys
 K_MESSAGE_ID = "slots:message_id"
@@ -73,6 +75,11 @@ K_JACKPOT_POOL = "slots:jackpot:pool"
 K_NORMAL_TOKENS = "slots:ntokens:{user_id}"  # int 0..3
 K_NORMAL_LAST   = "slots:nlast:{user_id}"    # epoch seconds of last refill calc
 K_BIGGEST_SPINS = "slots:biggest_spins"
+K_DUEL_REQ = "slots:duel:req:{message_id}"      # JSON: open duel request
+K_DUEL_ACTIVE_BY_USER = "slots:duel:active_by_user"  # hash user_id -> message_id
+K_DUEL_LOCK = "slots:duel:lock:{message_id}"    # simple accept lock
+K_DUEL_WINS = "slots:duel:wins"                 # hash user_id -> wins
+K_DUEL_LOSSES = "slots:duel:losses"             # hash user_id -> losses
 
 # Optional: track mega spins separately
 K_STATS_SPINS_MEGA = "slots:stats:spins_mega"      # hash user_id -> total mega spins
@@ -140,6 +147,64 @@ class SlotsSpinView(discord.ui.View):
         if not cog:
             return await interaction.response.send_message("Slots are temporarily unavailable.", ephemeral=True)
         await cog.handle_spin(interaction, mega=True)
+
+    @discord.ui.button(label="1v1", style=discord.ButtonStyle.secondary, custom_id="slots:duel:new")
+    async def duel_new(self, interaction: discord.Interaction, button: discord.ui.Button):
+        cog: "SlotsCog" = interaction.client.get_cog("SlotsCog")  # type: ignore
+        if not cog:
+            return await interaction.response.send_message("Slots are temporarily unavailable.", ephemeral=True)
+        await cog.start_duel(interaction)
+
+class DuelAcceptView(discord.ui.View):
+    def __init__(self, cog: "SlotsCog", *, message_id: int, channel_id: int, duel_key: str, initiator_id: int, initiator_fee: int, expires_at: int):
+        super().__init__(timeout=DUEL_TIMEOUT_SECONDS)
+        self.cog = cog
+        self.message_id = message_id
+        self.channel_id = channel_id
+        self.duel_key = duel_key
+        self.initiator_id = initiator_id
+        self.initiator_fee = initiator_fee
+        self.expires_at = expires_at
+
+    async def on_timeout(self):
+        # If still open, refund the initiator and mark expired
+        try:
+            data = await self.cog.r.get(self.duel_key)
+            if not data:
+                return
+            obj = json.loads(data)
+            if obj.get("state") != "open":
+                return
+            # mark expired
+            obj["state"] = "expired"
+            await self.cog.r.set(self.duel_key, json.dumps(obj), ex=60)
+
+            # refund initiator fee
+            uid = str(self.initiator_id)
+            fee = int(self.initiator_fee)
+            if fee > 0:
+                pipe = self.cog.r.pipeline()
+                pipe.hincrby(K_STATS_WINNINGS, uid, fee)
+                pipe.zincrby(K_LEADERBOARD, fee, uid)
+                pipe.hdel(K_DUEL_ACTIVE_BY_USER, uid)
+                await pipe.execute()
+
+            # disable button on message
+            ch = self.cog.bot.get_channel(self.channel_id) or await self.cog.bot.fetch_channel(self.channel_id)
+            if isinstance(ch, (discord.TextChannel, discord.Thread)):
+                try:
+                    msg = await ch.fetch_message(self.message_id)
+                    for item in self.children:
+                        item.disabled = True
+                    await msg.edit(view=self, content="⏲️ 1v1 challenge expired.")
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    @discord.ui.button(label="Accept 1v1", style=discord.ButtonStyle.success, custom_id="slots:duel:accept")
+    async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.accept_duel(interaction, self)
 
 class ResultShareView(discord.ui.View):
     def __init__(
@@ -557,6 +622,246 @@ class SlotsCog(commands.Cog):
             await interaction.followup.send(embed=embed, ephemeral=True, view=view)
         else:
             await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
+
+    async def start_duel(self, interaction: discord.Interaction):
+        await self._ensure_config_for_today()
+        user = interaction.user
+        uid = str(user.id)
+
+        # One open challenge per user
+        existing_mid = await self.r.hget(K_DUEL_ACTIVE_BY_USER, uid)
+        if existing_mid:
+            return await interaction.response.send_message("You already have a pending 1v1 challenge.", ephemeral=True)
+
+        # Fee: 5% of INITIATOR's points (opponent pays the SAME fee)
+        points = int(await self.r.hget(K_STATS_WINNINGS, uid) or 0)
+        init_fee = max(1, int(points * DUEL_FEE_FRACTION))
+        if points < init_fee or init_fee <= 0:
+            return await interaction.response.send_message("Not enough points to start a 1v1.", ephemeral=True)
+
+        # Deduct initiator's fee now
+        pipe = self.r.pipeline()
+        pipe.hincrby(K_STATS_WINNINGS, uid, -init_fee)
+        pipe.zincrby(K_LEADERBOARD, -init_fee, uid)
+        await pipe.execute()
+
+        now = int(datetime.now(tz=NY_TZ).timestamp())
+        expires_at = now + DUEL_TIMEOUT_SECONDS
+
+        # Public (silent) challenge post with delete_after to avoid spam
+        channel = interaction.channel
+        if not isinstance(channel, (discord.TextChannel, discord.Thread)):
+            return await interaction.response.send_message("Run this in a text channel.", ephemeral=True)
+
+        desc = (
+            f"🗡️ <@{uid}> has issued a **1v1 challenge**!\n"
+            f"Join cost: **{init_fee:,}** (same as challenger’s 5%).\n"
+            f"Expires **<t:{expires_at}:R>**.\n"
+            f"Staked by challenger: **{init_fee:,}**"
+        )
+        embed = discord.Embed(title="1v1 Challenge", description=desc, color=discord.Color.blurple())
+
+        # Prepare view; message_id filled after send
+        dummy_mid = 0
+        duel_key = K_DUEL_REQ.format(message_id=dummy_mid)
+        view = DuelAcceptView(
+            self,
+            message_id=0,
+            channel_id=channel.id,
+            duel_key=duel_key,
+            initiator_id=int(uid),
+            initiator_fee=init_fee,
+            expires_at=expires_at
+        )
+        posted = await channel.send(embed=embed, view=view, silent=True, delete_after=DUEL_TIMEOUT_SECONDS)
+        duel_key = K_DUEL_REQ.format(message_id=posted.id)
+        view.message_id = posted.id
+        view.duel_key = duel_key
+
+        duel_obj = {
+            "state": "open",
+            "initiator_id": int(uid),
+            "initiator_name": getattr(user, "global_name", None) or user.name,
+            "initiator_fee": init_fee,
+            "created": now,
+            "expires_at": expires_at,
+            "channel_id": posted.channel.id,
+            "message_id": posted.id
+        }
+        pipe = self.r.pipeline()
+        pipe.set(duel_key, json.dumps(duel_obj), ex=DUEL_TIMEOUT_SECONDS + 120)
+        pipe.hset(K_DUEL_ACTIVE_BY_USER, uid, posted.id)
+        await pipe.execute()
+
+        await interaction.response.send_message("1v1 challenge posted.", ephemeral=True)
+
+    async def accept_duel(self, interaction: discord.Interaction, view: DuelAcceptView):
+        now = int(datetime.now(tz=NY_TZ).timestamp())
+
+        # Single accept guard
+        lock_key = K_DUEL_LOCK.format(message_id=view.message_id)
+        if not await self.r.set(lock_key, "1", ex=DUEL_TIMEOUT_SECONDS, nx=True):
+            return await interaction.response.send_message("This 1v1 was already accepted or closed.", ephemeral=True)
+
+        data = await self.r.get(view.duel_key)
+        if not data:
+            return await interaction.response.send_message("This 1v1 has expired.", ephemeral=True)
+        obj = json.loads(data)
+        if obj.get("state") != "open" or now >= int(obj["expires_at"]):
+            return await interaction.response.send_message("This 1v1 has expired.", ephemeral=True)
+
+        initiator_id = int(obj["initiator_id"])
+        if interaction.user.id == initiator_id:
+            return await interaction.response.send_message("You can't accept your own 1v1.", ephemeral=True)
+
+        # Opponent pays the SAME fixed fee as calculated from the initiator
+        init_fee = int(obj["initiator_fee"])
+        opp_uid = str(interaction.user.id)
+        opp_points = int(await self.r.hget(K_STATS_WINNINGS, opp_uid) or 0)
+        if opp_points < init_fee:
+            return await interaction.response.send_message(
+                f"You need at least **{init_fee:,}** points to accept this 1v1.", ephemeral=True
+            )
+
+        # Deduct opponent fee now
+        pipe = self.r.pipeline()
+        pipe.hincrby(K_STATS_WINNINGS, opp_uid, -init_fee)
+        pipe.zincrby(K_LEADERBOARD, -init_fee, opp_uid)
+        await pipe.execute()
+
+        # Mark accepted
+        obj["state"] = "accepted"
+        obj["opponent_id"] = int(opp_uid)
+        obj["opponent_name"] = getattr(interaction.user, "global_name", None) or interaction.user.name
+        await self.r.set(view.duel_key, json.dumps(obj), ex=DUEL_TIMEOUT_SECONDS)
+
+        # Run both spins (normal rules, 5x5)
+        cfg = self._config
+        assert cfg is not None
+
+        async def spin_once(user_id: int):
+            grid, spin_total, breakdown, mult_used, grid_mult, total_mult = self._spin_and_score(cfg, bonus_multiplier=1.0, size=5)
+            jackpot_award = 0
+            jp = self._jackpot_trigger(grid, cfg)
+            if jp:
+                async with self.r.pipeline(transaction=True) as p:
+                    p.get(K_JACKPOT_POOL)
+                    p.set(K_JACKPOT_POOL, 0)
+                    res = await p.execute()
+                try:
+                    jackpot_award = int(res[0] or 0)
+                except Exception:
+                    jackpot_award = 0
+            total = spin_total + jackpot_award
+            return grid, total
+
+        g1, t1 = await spin_once(initiator_id)
+        g2, t2 = await spin_once(int(opp_uid))
+
+        pot_total = init_fee + init_fee + t1 + t2
+        house_cut = max(0, int(pot_total * 0.10))
+        winner_payout = pot_total - house_cut
+
+        # Decide winner (tie splits)
+        split = False
+        if t1 > t2:
+            winner_id, loser_id = initiator_id, int(opp_uid)
+        elif t2 > t1:
+            winner_id, loser_id = int(opp_uid), initiator_id
+        else:
+            split = True
+            winner_id = loser_id = None
+
+        # 10% to jackpot
+        if house_cut > 0:
+            await self.r.incrby(K_JACKPOT_POOL, house_cut)
+
+        # Credit payouts + W/L
+        if split:
+            share = winner_payout // 2
+            pipe = self.r.pipeline()
+            pipe.hincrby(K_STATS_WINNINGS, str(initiator_id), share)
+            pipe.hincrby(K_STATS_WINNINGS, opp_uid, share)
+            pipe.zincrby(K_LEADERBOARD, share, str(initiator_id))
+            pipe.zincrby(K_LEADERBOARD, share, opp_uid)
+            await pipe.execute()
+        else:
+            pipe = self.r.pipeline()
+            pipe.hincrby(K_STATS_WINNINGS, str(winner_id), winner_payout)
+            pipe.zincrby(K_LEADERBOARD, winner_payout, str(winner_id))
+            pipe.hincrby(K_DUEL_WINS, str(winner_id), 1)
+            pipe.hincrby(K_DUEL_LOSSES, str(loser_id), 1)
+            await pipe.execute()
+
+        # Close duel, clear mapping
+        pipe = self.r.pipeline()
+        pipe.hdel(K_DUEL_ACTIVE_BY_USER, str(initiator_id))
+        pipe.delete(view.duel_key)
+        await pipe.execute()
+
+        # Disable accept button on the original message (it will auto-delete soon anyway)
+        for item in view.children:
+            item.disabled = True
+        try:
+            if interaction.message:
+                await interaction.message.edit(view=view)
+        except Exception:
+            pass
+
+        # Build RESULT embed: grids in DESCRIPTION; other info as FIELDS
+        def grid_str(g): return "\n".join(" ".join(cell.token() for cell in row) for row in g)
+
+        desc = (
+            f"**Challenger <@{initiator_id}>**\n{grid_str(g1)}\n**Total:** {t1:,}\n\n"
+            f"**Opponent <@{opp_uid}>**\n{grid_str(g2)}\n**Total:** {t2:,}"
+        )
+
+        stakes = (
+            f"Challenger fee: **{init_fee:,}**\n"
+            f"Opponent fee: **{init_fee:,}**\n"
+            f"Pot: **{pot_total:,}**\n"
+            f"House → Jackpot (10%): **{house_cut:,}**"
+        )
+
+        if split:
+            outcome = f"Result: **Tie** — each receives **{(winner_payout // 2):,}**"
+            color = discord.Color.purple()
+        else:
+            outcome = f"Winner: <@{winner_id}> receives **{winner_payout:,}**"
+            color = discord.Color.purple()
+
+        embed = discord.Embed(title="⚔️ 1v1 Result", description=desc, color=color)
+        embed.add_field(name="Stakes & Pot", value=stakes, inline=False)
+        embed.add_field(name="Outcome", value=outcome, inline=False)
+
+        # Send results to the SHARE_THREAD_ID (silent). Fallback to current channel if not found.
+        target = self.bot.get_channel(SHARE_THREAD_ID)
+        if target is None:
+            try:
+                target = await self.bot.fetch_channel(SHARE_THREAD_ID)
+            except Exception:
+                target = None
+
+        try:
+            if isinstance(target, (discord.Thread, discord.TextChannel)):
+                await target.send(embed=embed, silent=True)
+            else:
+                await interaction.channel.send(embed=embed, silent=True)
+        except Exception:
+            # last-resort fallback
+            try:
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            except Exception:
+                pass
+
+        # Acknowledge accepter
+        try:
+            await interaction.response.send_message("1v1 resolved — results posted.", ephemeral=True)
+        except Exception:
+            try:
+                await interaction.followup.send("1v1 resolved — results posted.", ephemeral=True)
+            except Exception:
+                pass
 
     # ---------------- Core logic ----------------
 

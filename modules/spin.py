@@ -365,7 +365,7 @@ class SlotsCog(commands.Cog):
             if tokens <= 0:
                 #mins, secs = divmod(next_in, 60)
                 return await interaction.response.send_message(
-                    f"No normal spins available. Next charge in **<t:{spin_time_utc_sec + next_in}:R>** "
+                    f"No normal spins available. Next spin **<t:{spin_time_utc_sec + next_in}:R>** "
                     f"(you can store up to **{NORMAL_TOKENS_CAP}**).",
                     ephemeral=True
                 )

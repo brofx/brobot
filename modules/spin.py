@@ -173,7 +173,7 @@ class ResultShareView(discord.ui.View):
             description=self.share_description,
             color=self.color
         )
-        embed.add_field(name="Grid", value=self.grid_str, inline=False)
+        embed.add_field(name="Summary", value=self.grid_str, inline=False)
 
         try:
             await channel.send(content=f"Spin by <@{self.author_id}>", embed=embed)
@@ -454,7 +454,7 @@ class SlotsCog(commands.Cog):
 
         if not mega:
             if net_delta > 0:
-                desc_lines.append(f"**You won:** {net_delta:,} {'(multiplied!)' if mult_used else ''}")
+                desc_lines.append(f"**You won:** {net_delta:,}")
             else:
                 desc_lines.append("No win this time!")
 
@@ -483,10 +483,11 @@ class SlotsCog(commands.Cog):
 
         embed = discord.Embed(
             title=title,
-            description="\n".join(desc_lines),
+            description=grid_str,
             color=discord.Color.orange() if mega else (discord.Color.green() if net_delta > 0 else discord.Color.dark_gray())
         )
-        embed.add_field(name="Grid", value=grid_str, inline=False)
+
+        embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
         if jackpot_award > 0:
             desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:,}")
 
@@ -495,8 +496,8 @@ class SlotsCog(commands.Cog):
             thread_id=SHARE_THREAD_ID,
             author_id=user.id,
             share_title=title,
-            share_description="\n".join(desc_lines),
-            grid_str=grid_str,
+            share_description=grid_str,
+            grid_str="\n".join(desc_lines),
             color=embed.color
         )
 

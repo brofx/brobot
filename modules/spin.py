@@ -752,7 +752,7 @@ class SlotsCog(commands.Cog):
             description=cfg.instructions,
             color=discord.Color.gold()
         )
-        embed.add_field(name="Progressive Jackpot", value=f"**{pool_val:,}**", inline=True)
+        embed.add_field(name="Progressive Jackpot (20+ Matching Symbols)", value=f"**{pool_val:,}**", inline=True)
         embed.add_field(name="Leaderboard (Top 10)", value="\n".join(lb_lines), inline=False)
         embed.add_field(name="Recent Big Wins", value="\n".join(feed_lines), inline=False)
         if last_cfg_date:

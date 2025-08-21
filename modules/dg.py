@@ -99,9 +99,7 @@ class RandomizeCards(commands.Cog):
             ),
             url=url,
             color=color,
-            timestamp=datetime.utcnow(),
         )
-        embed.set_footer(text="UDisc • Randomized by Bot")
         if thumb_url:
             embed.set_thumbnail(url=thumb_url)
 

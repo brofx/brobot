@@ -49,7 +49,7 @@ REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 SHARE_THREAD_ID = int(os.getenv("SLOTS_SHARE_THREAD_ID", "1407752230425067653"))  # Target thread id for sharing spin results
 CONFIG_PATH = os.getenv("SLOTS_CONFIG_PATH", "slots_config.json")
 
-BIGWINS_FEED_LEN = 10
+BIGWINS_FEED_LEN = 5
 LEADERBOARD_LEN = 10
 COOLDOWN_SECONDS = 300  # 5 minutes
 MEGA_SPINS_PER_DAY = 3
@@ -59,6 +59,7 @@ MEGA_PAYOUT_MULT = 3.69  # global multiplier applied to the spin total when usin
 JACKPOT_MIN_MATCHES = 20
 COOLDOWN_SECONDS = 300  # 5 minutes
 NORMAL_TOKENS_CAP = 5   # up to 5 stored normal spins
+BIGGEST_SPINS_LEN = 5
 
 # Redis keys
 K_MESSAGE_ID = "slots:message_id"
@@ -71,6 +72,7 @@ K_STATS_WINNINGS = "slots:stats:winnings"  # hash user_id -> total winnings (all
 K_JACKPOT_POOL = "slots:jackpot:pool"
 K_NORMAL_TOKENS = "slots:ntokens:{user_id}"  # int 0..3
 K_NORMAL_LAST   = "slots:nlast:{user_id}"    # epoch seconds of last refill calc
+K_BIGGEST_SPINS = "slots:biggest_spins"
 
 # Optional: track mega spins separately
 K_STATS_SPINS_MEGA = "slots:stats:spins_mega"      # hash user_id -> total mega spins
@@ -450,6 +452,24 @@ class SlotsCog(commands.Cog):
 
         user_name = getattr(interaction.user, "global_name", None) or interaction.user.name
 
+        if net_delta > 0:
+            biggest_entry = {
+                "user_id": int(user_id),
+                "username": user_name,
+                "amount": net_delta,
+                "utc_sec": spin_time_utc_sec,
+                "mega": bool(mega)
+            }
+            member = json.dumps(biggest_entry, separators=(",", ":"))
+            await self.r.zadd(K_BIGGEST_SPINS, {member: net_delta})
+
+            # keep only the top ~200 to bound memory (optional)
+            max_keep = 200
+            total = await self.r.zcard(K_BIGGEST_SPINS)
+            remove_n = total - max_keep
+            if remove_n > 0:
+                await self.r.zremrangebyrank(K_BIGGEST_SPINS, 0, remove_n - 1)
+
         # Big-wins feed uses net
         if net_delta >= cfg.big_win_threshold or jackpot_award > 0:
             entry = {
@@ -745,6 +765,24 @@ class SlotsCog(commands.Cog):
         else:
             lb_lines.append("_No entries yet._")
 
+        biggest = await self.r.zrevrange(K_BIGGEST_SPINS, 0, BIGGEST_SPINS_LEN - 1, withscores=True)
+        big_lines: List[str] = []
+        if biggest:
+            for i, (member, score) in enumerate(biggest, start=1):
+                try:
+                    obj = json.loads(member)
+                    uid = int(obj.get("user_id", 0))
+                    amt = int(obj.get("amount", int(score)))
+                    utc_sec = int(obj.get("utc_sec", 0))
+                    mega_tag = " • **MEGA**" if obj.get("mega") else ""
+                    # relative timestamp like your Big Wins feed: <t:...:R>
+                    when = f"<t:{utc_sec}:R>" if utc_sec > 0 else ""
+                    big_lines.append(f"`{i:>2}.` <@{uid}> — **{amt:,}** • {when}{mega_tag}")
+                except Exception:
+                    continue
+        else:
+            big_lines.append("_No spins recorded yet._")
+
         # Big wins feed (most recent first)
         feed_raw = await self.r.lrange(K_BIGWINS, 0, 9)
         feed_lines: List[str] = []
@@ -769,8 +807,10 @@ class SlotsCog(commands.Cog):
             description=cfg.instructions,
             color=discord.Color.gold()
         )
-        embed.add_field(name="Progressive Jackpot (20+ Matching Symbols)", value=f"{pool_val:,}", inline=True)
-        embed.add_field(name="Leaderboard (Top 10)", value="\n".join(lb_lines), inline=False)
+        
+        embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_val:,}", inline=True)
+        embed.add_field(name=f"Leaderboard (Top {LEADERBOARD_LEN})", value="\n".join(lb_lines), inline=False)
+        embed.add_field(name=f"Biggest Spins (Top {BIGGEST_SPINS_LEN})", value="\n".join(big_lines), inline=False)
         embed.add_field(name="Recent Big Wins", value="\n".join(feed_lines), inline=False)
         if last_cfg_date:
             embed.set_footer(text=f"Config last loaded for: {last_cfg_date} (ET)")

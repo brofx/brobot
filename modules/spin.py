@@ -60,7 +60,7 @@ JACKPOT_MIN_MATCHES = 20
 COOLDOWN_SECONDS = 300  # 5 minutes
 NORMAL_TOKENS_CAP = 5   # up to 5 stored normal spins
 BIGGEST_SPINS_LEN = 5
-DUEL_TIMEOUT_SECONDS = 300
+DUEL_TIMEOUT_SECONDS = 60 * 60 # 1 Hour
 DUEL_FEE_FRACTION = 0.05  # 5%
 
 # Redis keys
@@ -141,14 +141,14 @@ class SlotsSpinView(discord.ui.View):
             return await interaction.response.send_message("Slots are temporarily unavailable.", ephemeral=True)
         await cog.handle_spin(interaction, mega=False)
 
-    @discord.ui.button(label="💥 MEGA Spin", style=discord.ButtonStyle.danger, custom_id="slots:spin:mega")
+    @discord.ui.button(label="🤖 MEGA Spin", style=discord.ButtonStyle.success, custom_id="slots:spin:mega")
     async def spin_mega(self, interaction: discord.Interaction, button: discord.ui.Button):
         cog: "SlotsCog" = interaction.client.get_cog("SlotsCog")  # type: ignore
         if not cog:
             return await interaction.response.send_message("Slots are temporarily unavailable.", ephemeral=True)
         await cog.handle_spin(interaction, mega=True)
 
-    @discord.ui.button(label="1v1", style=discord.ButtonStyle.secondary, custom_id="slots:duel:new")
+    @discord.ui.button(label="🗡️ 1v1", style=discord.ButtonStyle.secondary, custom_id="slots:duel:new")
     async def duel_new(self, interaction: discord.Interaction, button: discord.ui.Button):
         cog: "SlotsCog" = interaction.client.get_cog("SlotsCog")  # type: ignore
         if not cog:
@@ -563,7 +563,7 @@ class SlotsCog(commands.Cog):
         avg = (total_wins_accum / total_spins) if total_spins > 0 else 0.0
 
         desc_lines = []
-        title = "🎰 Your Spin Result" if not mega else "💥 MEGA Spin Result"
+        title = "🎰 Your Spin Result" if not mega else "🤖 MEGA Spin Result"
 
         if not mega:
             if net_delta > 0:

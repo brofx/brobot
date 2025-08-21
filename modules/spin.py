@@ -38,7 +38,7 @@ NY_TZ = ZoneInfo("America/New_York")
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_DB = int(os.getenv("REDIS_DB", "0"))
-
+SHARE_THREAD_ID = int(os.getenv("SLOTS_SHARE_THREAD_ID", "1407752230425067653"))  # Target thread id for sharing spin results
 CONFIG_PATH = os.getenv("SLOTS_CONFIG_PATH", "slots_config.json")
 DAILY_SPINS = 5
 BIGWINS_FEED_LEN = 20
@@ -130,6 +130,56 @@ class SlotsSpinView(discord.ui.View):
         if not cog:
             return await interaction.response.send_message("Slots are temporarily unavailable.", ephemeral=True)
         await cog.handle_spin(interaction, mega=True)
+
+class ResultShareView(discord.ui.View):
+    def __init__(
+        self,
+        bot: commands.Bot,
+        thread_id: int,
+        author_id: int,
+        share_title: str,
+        share_description: str,
+        grid_str: str,
+        color: discord.Color,
+    ):
+        super().__init__(timeout=180)
+        self.bot = bot
+        self.thread_id = thread_id
+        self.author_id = author_id
+        self.share_title = share_title
+        self.share_description = share_description
+        self.grid_str = grid_str
+        self.color = color
+
+    @discord.ui.button(label="📣 Share to thread", style=discord.ButtonStyle.secondary, custom_id="slots:share_result")
+    async def share(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            return await interaction.response.send_message("Only the original spinner can share this result.", ephemeral=True)
+        if not self.thread_id:
+            return await interaction.response.send_message("Share thread is not configured.", ephemeral=True)
+
+        channel = self.bot.get_channel(self.thread_id)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(self.thread_id)
+            except Exception:
+                channel = None
+
+        if channel is None or not isinstance(channel, discord.Thread):
+            return await interaction.response.send_message("Configured share target is not a valid thread.", ephemeral=True)
+
+        embed = discord.Embed(
+            title=self.share_title,
+            description=self.share_description,
+            color=self.color
+        )
+        embed.add_field(name="Grid", value=self.grid_str, inline=False)
+
+        try:
+            await channel.send(content=f"Spin by <@{self.author_id}>", embed=embed)
+            await interaction.response.send_message("Shared to the thread. 📣", ephemeral=True)
+        except Exception:
+            await interaction.response.send_message("Couldn't post to the thread (permissions/archived?).", ephemeral=True)
 
 class SlotsCog(commands.Cog):
     """5x5 emoji slots with daily limits, persistent channel message, leaderboard, and big-wins feed."""
@@ -441,10 +491,20 @@ class SlotsCog(commands.Cog):
         if jackpot_award > 0:
             desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:,}")
 
+        view = ResultShareView(
+            bot=self.bot,
+            thread_id=SHARE_THREAD_ID,
+            author_id=user.id,
+            share_title=title,
+            share_description="\n".join(desc_lines),
+            grid_str=grid_str,
+            color=embed.color
+        )
+
         if interaction.response.is_done():
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed, ephemeral=True, view=view)
         else:
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
 
     # ---------------- Core logic ----------------
 
@@ -534,7 +594,7 @@ class SlotsCog(commands.Cog):
         return None
 
     def _render_grid(self, grid: List[List[Item]]) -> str:
-        return "\n".join("# " + " ".join(cell.token() for cell in row) for row in grid)
+        return "\n".join(" ".join(cell.token() for cell in row) for row in grid)
 
     def _spin_and_score(self, cfg: SlotsConfig, *, bonus_multiplier: float = 1.0) -> Tuple[List[List[Item]], int, List[str], bool]:
         population = cfg.items

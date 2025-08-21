@@ -737,17 +737,35 @@ class SlotsCog(commands.Cog):
         else:
             await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
 
+    # Replace your start_duel method with this version (auto-cleans stale mappings before blocking)
     async def start_duel(self, interaction: discord.Interaction):
         await self._ensure_config_for_today()
         user = interaction.user
         uid = str(user.id)
+        now = int(datetime.now(tz=NY_TZ).timestamp())
 
-        # One open challenge per user
+        # Auto-clean stale "pending 1v1" mapping before enforcing it
         existing_mid = await self.r.hget(K_DUEL_ACTIVE_BY_USER, uid)
         if existing_mid:
-            return await interaction.response.send_message("You already have a pending 1v1 challenge.", ephemeral=True)
+            dkey = K_DUEL_REQ.format(message_id=int(existing_mid))
+            data = await self.r.get(dkey)
+            stale = False
+            if not data:
+                stale = True
+            else:
+                try:
+                    obj = json.loads(data)
+                    # stale if not open or already past expiry
+                    if obj.get("state") != "open" or now >= int(obj.get("expires_at", 0) or 0):
+                        stale = True
+                except Exception:
+                    stale = True
+            if stale:
+                await self.r.hdel(K_DUEL_ACTIVE_BY_USER, uid)
+            else:
+                return await interaction.response.send_message("You already have a pending 1v1 challenge.", ephemeral=True)
 
-        # Fee: 5% of INITIATOR's points (opponent pays the SAME fee)
+        # Fee: 5% of INITIATOR's points (opponent pays the SAME fixed fee)
         points = int(await self.r.hget(K_STATS_WINNINGS, uid) or 0)
         init_fee = max(1, int(points * DUEL_FEE_FRACTION))
         if points < init_fee or init_fee <= 0:
@@ -759,10 +777,9 @@ class SlotsCog(commands.Cog):
         pipe.zincrby(K_LEADERBOARD, -init_fee, uid)
         await pipe.execute()
 
-        now = int(datetime.now(tz=NY_TZ).timestamp())
         expires_at = now + DUEL_TIMEOUT_SECONDS
 
-        # Public (silent) challenge post with delete_after to avoid spam
+        # Post public (silent) challenge with delete_after to avoid spam
         channel = interaction.channel
         if not isinstance(channel, (discord.TextChannel, discord.Thread)):
             return await interaction.response.send_message("Run this in a text channel.", ephemeral=True)
@@ -775,9 +792,8 @@ class SlotsCog(commands.Cog):
         )
         embed = discord.Embed(title="1v1 Challenge", description=desc, color=discord.Color.blurple())
 
-        # Prepare view; message_id filled after send
-        dummy_mid = 0
-        duel_key = K_DUEL_REQ.format(message_id=dummy_mid)
+        # Prepare view; fill message_id after send
+        duel_key = K_DUEL_REQ.format(message_id=0)
         view = DuelAcceptView(
             self,
             message_id=0,

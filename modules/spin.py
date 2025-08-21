@@ -391,13 +391,15 @@ class SlotsCog(commands.Cog):
 
         # Perform spin
         bonus_mult = MEGA_PAYOUT_MULT if mega else 1.0
-        grid, base_total, breakdown, mult_used = self._spin_and_score(cfg, bonus_multiplier=bonus_mult)
+        board_size = 7 if mega else 5
+        grid, spin_total, breakdown, mult_used, grid_mult, total_mult = self._spin_and_score(
+            cfg, bonus_multiplier=bonus_mult, size=board_size
+        )
 
         # --- Progressive Jackpot check (applies to ALL spins) ---
         jackpot_award = 0
         jp = self._jackpot_trigger(grid, cfg)
         if jp:
-            # Atomically fetch and clear the jackpot pool
             async with self.r.pipeline(transaction=True) as p:
                 p.get(K_JACKPOT_POOL)
                 p.set(K_JACKPOT_POOL, 0)
@@ -406,24 +408,20 @@ class SlotsCog(commands.Cog):
                 jackpot_award = int(res[0] or 0)
             except Exception:
                 jackpot_award = 0
-
             if jackpot_award > 0:
                 _, eff, token = jp
                 breakdown.append(f"💰 **JACKPOT!** {token} reached {eff} (incl. wilds) → +{jackpot_award:,}")
 
-        # Gross result of the spin (does NOT subtract MEGA cost here)
-        gross_total = base_total + jackpot_award
+        gross_total = spin_total + jackpot_award
 
-        # Update stats (cost already deducted above for MEGA, so we add gross_total only)
+        net_delta = gross_total - (cost if mega else 0)
+
         await self.r.hincrby(K_STATS_SPINS, user_id, 1)
         if mega:
             await self.r.hincrby(K_STATS_SPINS_MEGA, user_id, 1)
         if gross_total:
             await self.r.hincrby(K_STATS_WINNINGS, user_id, gross_total)
             await self.r.zincrby(K_LEADERBOARD, gross_total, user_id)
-
-        # Net change for display
-        net_delta = gross_total - (cost if mega else 0)
 
         # Big-wins feed uses net
         if net_delta >= cfg.big_win_threshold or jackpot_award > 0:
@@ -487,6 +485,7 @@ class SlotsCog(commands.Cog):
             description="\n".join(desc_lines),
             color=discord.Color.orange() if mega else (discord.Color.green() if net_delta > 0 else discord.Color.dark_gray())
         )
+        embed.add_field(name="Total multiplier", value=f"×{total_mult:g}", inline=True)
         embed.add_field(name="Grid", value=grid_str, inline=False)
         if jackpot_award > 0:
             desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:,}")
@@ -596,21 +595,37 @@ class SlotsCog(commands.Cog):
     def _render_grid(self, grid: List[List[Item]]) -> str:
         return "\n".join(" ".join(cell.token() for cell in row) for row in grid)
 
-    def _spin_and_score(self, cfg: SlotsConfig, *, bonus_multiplier: float = 1.0) -> Tuple[List[List[Item]], int, List[str], bool]:
+    def _spin_and_score(
+        self,
+        cfg: SlotsConfig,
+        *,
+        bonus_multiplier: float = 1.0,
+        size: int = 5
+    ) -> Tuple[List[List[Item]], int, List[str], bool, int, float]:
+        """
+        Returns:
+        grid,
+        total_after_multipliers (int, excludes jackpot),
+        breakdown (list[str]),
+        mult_used (bool),
+        grid_multiplier (int, product of in-grid multipliers),
+        total_multiplier (float, grid_multiplier * bonus_multiplier)
+        """
         population = cfg.items
         weights = [max(0.0, it.weight) for it in population]
 
+        # draw grid
         grid: List[List[Item]] = []
-        for _ in range(5):
-            row = random.choices(population, weights=weights, k=5)
+        for _ in range(size):
+            row = random.choices(population, weights=weights, k=size)
             grid.append(row)
 
         breakdown: List[str] = []
-        total = 0
+        total_base = 0
 
         def score_line(items: List[Item]) -> Tuple[int, Optional[str]]:
             symbols = [it for it in items if not it.is_multiplier]
-            wild_count = sum(1 for it in items if it.is_wild)
+            wild_count = sum(1 for it in items if getattr(it, "is_wild", False))
             by_key: Dict[str, int] = {}
             for it in symbols:
                 if not it.is_wild:
@@ -628,7 +643,7 @@ class SlotsCog(commands.Cog):
                     eff = cnt + wild_count
                     candidates.append((k, eff, base_item.base_value))
             else:
-                base_item = next((x for x in cfg.items if x.is_wild), None)
+                base_item = next((x for x in cfg.items if getattr(x, "is_wild", False)), None)
                 if base_item and wild_count >= 3 and base_item.base_value > 0:
                     candidates.append((base_item.key, wild_count, base_item.base_value))
 
@@ -644,33 +659,34 @@ class SlotsCog(commands.Cog):
 
             line_win = best_value * best_count
             ref_item = next((x for x in cfg.items if x.key == best_key), None)
-            name = ref_item.token() if ref_item else best_key
+            name = ref_item.token() if ref_item and hasattr(ref_item, "token") else (ref_item.emoji if ref_item else best_key)
             return line_win, f"{name} x{best_count} → {line_win:,}"
 
-        for r in range(5):
+        # rows
+        for r in range(size):
             amt, info = score_line(grid[r])
-            total += amt
+            total_base += amt
             if info and amt > 0:
                 breakdown.append(f"Row {r+1}: {info}")
-
-        for c in range(5):
-            col = [grid[r][c] for r in range(5)]
+        # cols
+        for c in range(size):
+            col = [grid[r][c] for r in range(size)]
             amt, info = score_line(col)
-            total += amt
+            total_base += amt
             if info and amt > 0:
                 breakdown.append(f"Col {c+1}: {info}")
 
-        mults = [it.multiplier for row in grid for it in row if it.is_multiplier and it.multiplier > 1]
-        mult_product = 1
-        for m in mults:
-            mult_product *= m
-        mult_used = mult_product > 1
+        # Multipliers in-grid
+        grid_mult = 1
+        for it in (cell for row in grid for cell in row):
+            if getattr(it, "is_multiplier", False) and it.multiplier > 1:
+                grid_mult *= it.multiplier
 
-        total *= mult_product
-        if bonus_multiplier != 1.0:
-            total = int(total * bonus_multiplier)
+        total_mult = grid_mult * (bonus_multiplier if bonus_multiplier else 1.0)
+        mult_used = total_mult > 1.0
+        total_after = int(total_base * total_mult)
 
-        return grid, total, breakdown, mult_used
+        return grid, total_after, breakdown, mult_used, grid_mult, total_mult
 
     # ---------------- Persistent channel message ----------------
 

@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 import time
+import logging
 
 import discord
 from discord.ext import commands
@@ -32,6 +33,8 @@ try:
     from zoneinfo import ZoneInfo
 except ImportError:
     from backports.zoneinfo import ZoneInfo  # type: ignore
+
+logger = logging.getLogger(__name__)
 
 NY_TZ = ZoneInfo("America/New_York")
 
@@ -499,7 +502,7 @@ class SlotsCog(commands.Cog):
         embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
         embed.set_footer(text=spin_time)
 
-        print(f"[{spin_time}] {"\n\t".join([user_name] + desc_lines)}")
+        logger.info(f"[{spin_time}] {"\n\t".join([user_name] + desc_lines)}")
 
         view = ResultShareView(
             bot=self.bot,

@@ -52,13 +52,13 @@ CONFIG_PATH = os.getenv("SLOTS_CONFIG_PATH", "slots_config.json")
 BIGWINS_FEED_LEN = 5
 LEADERBOARD_LEN = 10
 COOLDOWN_SECONDS = 300  # 5 minutes
-MEGA_SPINS_PER_DAY = 3
+MEGA_SPINS_PER_DAY = 5
 MEGA_MIN_POINTS = 1000
 MEGA_COST_FRACTION = 0.10
 MEGA_PAYOUT_MULT = 3.69  # global multiplier applied to the spin total when using MEGA
 JACKPOT_MIN_MATCHES = 20
 COOLDOWN_SECONDS = 300  # 5 minutes
-NORMAL_TOKENS_CAP = 5   # up to 5 stored normal spins
+NORMAL_TOKENS_CAP = 6   # up to 5 stored normal spins
 BIGGEST_SPINS_LEN = 5
 DUEL_TIMEOUT_SECONDS = 60 * 60 # 1 Hour
 DUEL_FEE_FRACTION = 0.05  # 5%
@@ -576,28 +576,31 @@ class SlotsCog(commands.Cog):
                 desc_lines.append(f"**You won:** {net_delta:,}")
             else:
                 desc_lines.append("No win this time!")
-
-            # show remaining tokens and next refill
-            tok_left, next_in = await self._refill_normal_tokens(user.id)
-            if tok_left < NORMAL_TOKENS_CAP and next_in > 0:
-                # mins, secs = divmod(next_in, 60)
-                desc_lines.append(f"**Remaining spins:** {tok_left}/{NORMAL_TOKENS_CAP} (+1 <t:{spin_time_utc_sec + next_in}:R>)")
-            else:
-                desc_lines.append(f"**Remaining spins:** {tok_left}/{NORMAL_TOKENS_CAP}")
         else:
             # MEGA info block
-            used_after = int(await self.r.get(mega_plays_key(user.id, date_str)) or 0)
-            remaining = max(0, MEGA_SPINS_PER_DAY - used_after)
             # Present gross, cost, net
             gross_line = f"Gross win (incl. MEGA x{MEGA_PAYOUT_MULT:.1f}): **{gross_total:,}**"
             cost_line = f"MEGA cost (10%): **-{cost:,}**"
             net_line = f"**Net change:** **{net_delta:,}**"
-            desc_lines.extend([gross_line, cost_line, net_line, f"**MEGA spins left today:** {remaining}/{MEGA_SPINS_PER_DAY}"])
+            desc_lines.extend([gross_line, cost_line, net_line])
 
         if breakdown:
             desc_lines += [f"- {line}" for line in breakdown]
 
         desc_lines.append(f"**Total multiplier:** {total_mult:g}×")
+
+        # show remaining tokens and next refill
+        tok_left, next_in = await self._refill_normal_tokens(user.id)
+        if tok_left < NORMAL_TOKENS_CAP and next_in > 0:
+            # mins, secs = divmod(next_in, 60)
+            desc_lines.append(f"**Normal spins remaining:** {tok_left}/{NORMAL_TOKENS_CAP} (+1 <t:{spin_time_utc_sec + next_in}:R>)")
+        else:
+            desc_lines.append(f"**Normal spins remaining:** {tok_left}/{NORMAL_TOKENS_CAP}")
+
+        used_after = int(await self.r.get(mega_plays_key(user.id, date_str)) or 0)
+        remaining = max(0, MEGA_SPINS_PER_DAY - used_after)
+        desc_lines.append(f"**MEGA spins remaining:** {remaining}/{MEGA_SPINS_PER_DAY}")
+
         desc_lines.append(f"**Your totals:** spins={total_spins}, points={total_wins_accum:,}, avg/spin={avg:,.2f}")
 
         embed = discord.Embed(

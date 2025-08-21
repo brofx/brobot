@@ -428,11 +428,13 @@ class SlotsCog(commands.Cog):
             await self.r.hincrby(K_STATS_WINNINGS, user_id, gross_total)
             await self.r.zincrby(K_LEADERBOARD, gross_total, user_id)
 
+        user_name = getattr(interaction.user, "global_name", None) or interaction.user.name
+
         # Big-wins feed uses net
         if net_delta >= cfg.big_win_threshold or jackpot_award > 0:
             entry = {
                 "user_id": int(user_id),
-                "username": getattr(interaction.user, "global_name", None) or interaction.user.name,
+                "username": user_name,
                 "amount": net_delta,
                 "date": date_str,
                 "mega": mega,
@@ -496,6 +498,8 @@ class SlotsCog(commands.Cog):
         
         embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
         embed.set_footer(text=spin_time)
+
+        print(f"[{spin_time}] {"\n\t".join([user_name] + desc_lines)}")
 
         view = ResultShareView(
             bot=self.bot,

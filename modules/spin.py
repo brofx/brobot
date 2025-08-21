@@ -424,6 +424,105 @@ class SlotsCog(commands.Cog):
             mention_author=False
         )
 
+    @commands.command(name="duels_refund_all",
+    help="Admin: clear ALL pending 1v1 duels (open/accepted) and refund any deducted fees. Also deletes challenge messages. (manage_guild)")
+    @commands.has_guild_permissions(manage_guild=True)
+    @commands.guild_only()
+    async def duels_refund_all(self, ctx: commands.Context):
+        """
+        Scans all duel requests:
+        - If state == 'open': refund initiator's fee (only if still mapped as active), close & delete.
+        - If state == 'accepted': refund initiator & opponent fees (only if still mapped as active), close & delete.
+        Also removes accept locks and tries to delete the challenge message if it still exists.
+        """
+        pattern = "slots:duel:req:*"
+        refunded_initiators = 0
+        refunded_opponents = 0
+        closed = 0
+        skipped = 0
+
+        # gather keys first (avoid modifying while scanning)
+        duel_keys = []
+        async for k in self.r.scan_iter(match=pattern):
+            duel_keys.append(k)
+
+        for dkey in duel_keys:
+            data = await self.r.get(dkey)
+            if not data:
+                continue
+
+            try:
+                obj = json.loads(data)
+            except Exception:
+                # can't parse; delete broken key
+                await self.r.delete(dkey)
+                closed += 1
+                continue
+
+            state = obj.get("state", "open")
+            initiator_id = int(obj.get("initiator_id", 0) or 0)
+            initiator_fee = int(obj.get("initiator_fee", 0) or 0)
+            opponent_id = int(obj.get("opponent_id", 0) or 0)
+            channel_id = int(obj.get("channel_id", 0) or 0)
+            message_id = int(obj.get("message_id", 0) or 0)
+
+            # Only refund if this duel still shows as active for the initiator (prevents double refunds)
+            active_mid = await self.r.hget(K_DUEL_ACTIVE_BY_USER, str(initiator_id))
+            is_active = (active_mid is not None) and (message_id and str(message_id) == str(active_mid))
+
+            if state not in ("open", "accepted") or not is_active:
+                # Not a pending duel (or mapping is gone) — skip to avoid double refunds
+                skipped += 1
+                # but still clean up stale lock and possibly delete key if it lingers in weird state
+                try:
+                    if message_id:
+                        await self.r.delete(K_DUEL_LOCK.format(message_id=message_id))
+                except Exception:
+                    pass
+                continue
+
+            pipe = self.r.pipeline()
+
+            # Refund initiator fee
+            if initiator_id and initiator_fee > 0:
+                pipe.hincrby(K_STATS_WINNINGS, str(initiator_id), initiator_fee)
+                pipe.zincrby(K_LEADERBOARD, initiator_fee, str(initiator_id))
+                refunded_initiators += 1
+
+            # If accepted, also refund opponent (same fee as initiator)
+            if state == "accepted" and opponent_id and initiator_fee > 0:
+                pipe.hincrby(K_STATS_WINNINGS, str(opponent_id), initiator_fee)
+                pipe.zincrby(K_LEADERBOARD, initiator_fee, str(opponent_id))
+                refunded_opponents += 1
+
+            # Clear mappings/locks and delete duel key
+            pipe.hdel(K_DUEL_ACTIVE_BY_USER, str(initiator_id))
+            if message_id:
+                pipe.delete(K_DUEL_LOCK.format(message_id=message_id))
+            pipe.delete(dkey)
+
+            await pipe.execute()
+            closed += 1
+
+            # Try to delete the original challenge message (if it still exists)
+            if channel_id and message_id:
+                try:
+                    ch = self.bot.get_channel(channel_id) or await self.bot.fetch_channel(channel_id)
+                    if isinstance(ch, (discord.TextChannel, discord.Thread)):
+                        msg = await ch.fetch_message(message_id)
+                        await msg.delete()
+                except Exception:
+                    pass  # it's fine if it's already gone
+
+        await ctx.reply(
+            f"✅ Cleared stuck duels.\n"
+            f"- Closed: **{closed}**\n"
+            f"- Refunded initiators: **{refunded_initiators}**\n"
+            f"- Refunded opponents: **{refunded_opponents}**\n"
+            f"- Skipped (already resolved/not active): **{skipped}**",
+            mention_author=False
+        )
+
     # ---------------- Spin handling (button interaction) ----------------
 
     async def handle_spin(self, interaction: discord.Interaction, *, mega: bool):
@@ -444,7 +543,7 @@ class SlotsCog(commands.Cog):
             if tokens <= 0:
                 #mins, secs = divmod(next_in, 60)
                 return await interaction.response.send_message(
-                    f"No normal spins available. Next spin available: **<t:{spin_time_utc_sec + next_in}:R>** "
+                    f"No normal spins available. Next spin available **<t:{spin_time_utc_sec + next_in}:R>** "
                     f"\n(you can store up to **{NORMAL_TOKENS_CAP}**).",
                     ephemeral=True
                 )

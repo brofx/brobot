@@ -405,7 +405,9 @@ class SlotsCog(commands.Cog):
             K_STATS_SPINS_MEGA,
             K_STATS_WINNINGS,
             K_BIGWINS,
-            K_JACKPOT_POOL
+            K_JACKPOT_POOL,
+            K_DUEL_WINS, 
+            K_DUEL_LOSSES
         )
 
         try:

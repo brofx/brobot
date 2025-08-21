@@ -372,14 +372,14 @@ class SlotsCog(commands.Cog):
             # consume one token
             await self.r.decr(K_NORMAL_TOKENS.format(user_id=user.id))
 
-            # Increase jackpot by 1%
+            # Increase jackpot by .05%
             try:
                 jackpot_award = int(await self.r.get(K_JACKPOT_POOL))
             except Exception:
                 jackpot_award = 0
 
             if jackpot_award > 0:
-                await self.r.set(K_JACKPOT_POOL, int(jackpot_award * 1.01))
+                await self.r.set(K_JACKPOT_POOL, int(jackpot_award * 1.005))
         else:
             # MEGA spin: enforce per-day count and cost
             mkey = mega_plays_key(user.id, date_str)
@@ -419,7 +419,7 @@ class SlotsCog(commands.Cog):
         )
         # %-I to remove the leading zero is unix specific, %#I works on windows.
         
-        spin_time_str = spin_time.strftime("%B %d, %Y at %-I:%M %p %Z")
+        # spin_time_str = spin_time.strftime("%B %d, %Y at %-I:%M %p %Z")
 
         # --- Progressive Jackpot check (applies to ALL spins) ---
         jackpot_award = 0
@@ -529,7 +529,7 @@ class SlotsCog(commands.Cog):
             share_description=grid_str,
             grid_str="\n".join(desc_lines),
             color=embed.color,
-            spin_time=spin_time_str
+            spin_time=spin_time
         )
 
         if interaction.response.is_done():

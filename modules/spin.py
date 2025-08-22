@@ -224,7 +224,7 @@ class ResultShareView(discord.ui.View):
         author_id: int,
         share_title: str,
         share_description: str,
-        grid_str: str,
+        summary: str,
         color: discord.Color,
         spin_time: datetime,
     ):
@@ -234,7 +234,7 @@ class ResultShareView(discord.ui.View):
         self.author_id = author_id
         self.share_title = share_title
         self.share_description = share_description
-        self.grid_str = grid_str
+        self.summary = summary
         self.color = color
         self.spin_time = spin_time
 
@@ -260,7 +260,7 @@ class ResultShareView(discord.ui.View):
             description=self.share_description,
             color=self.color
         )
-        embed.add_field(name="Summary", value=self.grid_str, inline=False)
+        embed.add_field(name="Summary", value=self.summary, inline=False)
         embed.timestamp = self.spin_time
 
         try:
@@ -727,7 +727,7 @@ class SlotsCog(commands.Cog):
             author_id=user.id,
             share_title=title,
             share_description=grid_str,
-            grid_str="\n".join(desc_lines),
+            summary="\n".join(desc_lines),
             color=embed.color,
             spin_time=spin_time
         )
@@ -822,6 +822,8 @@ class SlotsCog(commands.Cog):
         pipe.set(duel_key, json.dumps(duel_obj), ex=DUEL_TIMEOUT_SECONDS + 120)
         pipe.hset(K_DUEL_ACTIVE_BY_USER, uid, posted.id)
         await pipe.execute()
+
+        await interaction.response.send_message("1v1 challenge posted.", ephemeral=True)
 
     async def accept_duel(self, interaction: discord.Interaction, view: DuelAcceptView):
         now = int(datetime.now(tz=NY_TZ).timestamp())
@@ -979,6 +981,14 @@ class SlotsCog(commands.Cog):
             # last-resort fallback
             try:
                 await interaction.followup.send(embed=embed, ephemeral=True)
+            except Exception:
+                pass
+
+        try:
+            await interaction.response.send_message("1v1 resolved — results posted.", ephemeral=True)
+        except Exception:
+            try:
+                await interaction.followup.send("1v1 resolved — results posted.", ephemeral=True)
             except Exception:
                 pass
 
@@ -1298,7 +1308,7 @@ class SlotsCog(commands.Cog):
             timestamp=datetime.now(tz=NY_TZ)
         )
         reset_ts = next_midnight_et_epoch()
-        embed.add_field(name="Next MEGA reset", value=f"<t:{reset_ts}:R>", inline=False)        
+        embed.add_field(name="Next MEGA spin refill", value=f"<t:{reset_ts}:R>", inline=False)        
         embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_val:,}\n**+0.5%** per normal spin", inline=False)
         embed.add_field(name=f"Leaderboard (Top {LEADERBOARD_LEN})", value="\n".join(lb_lines), inline=False)
         embed.add_field(name=f"Biggest Spins (Top {BIGGEST_SPINS_LEN})", value="\n".join(big_lines), inline=False)

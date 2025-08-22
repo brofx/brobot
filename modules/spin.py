@@ -62,6 +62,7 @@ NORMAL_TOKENS_CAP = 6   # up to 5 stored normal spins
 BIGGEST_SPINS_LEN = 5
 DUEL_TIMEOUT_SECONDS = 60 * 60 # 1 Hour
 DUEL_FEE_FRACTION = 0.05  # 5%
+DUEL_LEADERBOARD_LEN = 10
 
 # Redis keys
 K_MESSAGE_ID = "slots:message_id"
@@ -1313,6 +1314,29 @@ class SlotsCog(commands.Cog):
         embed.add_field(name=f"Leaderboard (Top {LEADERBOARD_LEN})", value="\n".join(lb_lines), inline=False)
         embed.add_field(name=f"Biggest Spins (Top {BIGGEST_SPINS_LEN})", value="\n".join(big_lines), inline=False)
         embed.add_field(name="Recent Big Wins", value="\n".join(feed_lines), inline=False)
+        wins_map = await self.r.hgetall(K_DUEL_WINS)
+        loss_map = await self.r.hgetall(K_DUEL_LOSSES)
+
+        duel_lines: List[str] = []
+        if wins_map or loss_map:
+            users = set(wins_map.keys()) | set(loss_map.keys())
+            rows = []
+            for uid in users:
+                w = int(wins_map.get(uid, 0))
+                l = int(loss_map.get(uid, 0))
+                total = w + l
+                if total <= 0:
+                    continue
+                rate = w / total
+                rows.append((uid, w, l, rate))
+            # sort: win rate desc, then wins desc
+            rows.sort(key=lambda t: (t[3], t[1]), reverse=True)
+            for i, (uid, w, l, rate) in enumerate(rows[:DUEL_LEADERBOARD_LEN], start=1):
+                duel_lines.append(f"`{i:>2}.` <@{int(uid)}> — **{w}–{l}** ({rate:.0%})")
+        else:
+            duel_lines.append("_No duels yet._")
+
+        embed.add_field(name="1v1 Leaderboard (Win Rate)", value="\n".join(duel_lines), inline=False)
         return embed
 
     async def _refresh_channel_message(self):

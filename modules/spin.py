@@ -871,7 +871,7 @@ class SlotsCog(commands.Cog):
         assert cfg is not None
 
         async def spin_once(user_id: int):
-            grid, spin_total, breakdown, mult_used, grid_mult, total_mult = self._spin_and_score(cfg, bonus_multiplier=1.0, size=5)
+            grid, spin_total, breakdown, mult_used, grid_mult, total_mult = self._spin_and_score(cfg, bonus_multiplier=1.0, size=6)
             jackpot_award = 0
             jp = self._jackpot_trigger(grid, cfg)
             if jp:

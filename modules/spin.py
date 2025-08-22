@@ -823,8 +823,6 @@ class SlotsCog(commands.Cog):
         pipe.hset(K_DUEL_ACTIVE_BY_USER, uid, posted.id)
         await pipe.execute()
 
-        await interaction.response.send_message("1v1 challenge posted.", ephemeral=True)
-
     async def accept_duel(self, interaction: discord.Interaction, view: DuelAcceptView):
         now = int(datetime.now(tz=NY_TZ).timestamp())
 
@@ -984,14 +982,17 @@ class SlotsCog(commands.Cog):
             except Exception:
                 pass
 
-        # Acknowledge accepter
+        # Delete original challenge message to avoid channel clutter
         try:
-            await interaction.response.send_message("1v1 resolved — results posted.", ephemeral=True)
+            if interaction.message:
+                await interaction.message.delete()
+            else:
+                ch = self.bot.get_channel(view.channel_id) or await self.bot.fetch_channel(view.channel_id)
+                if isinstance(ch, (discord.TextChannel, discord.Thread)):
+                    msg = await ch.fetch_message(view.message_id)
+                    await msg.delete()
         except Exception:
-            try:
-                await interaction.followup.send("1v1 resolved — results posted.", ephemeral=True)
-            except Exception:
-                pass
+            pass
 
     async def cancel_duel(self, interaction: discord.Interaction, view: "DuelAcceptView"):
         # Only the initiator can cancel

@@ -77,9 +77,6 @@ class RandomizeCards(commands.Cog):
         """Build a nice-looking embed with one field per card."""
         url = f"https://udisc.com/events/{event_slug}/participants"
         count = len(participants)
-        # Choose a thumbnail if any avatar is available
-        thumb_url = next((p.avatar_url for p in participants if p.avatar_url), None)
-
         # If we can find the event in the league cache, color by status
         color = EMBED_COLOR_DEFAULT
         try:
@@ -100,8 +97,6 @@ class RandomizeCards(commands.Cog):
             url=url,
             color=color,
         )
-        if thumb_url:
-            embed.set_thumbnail(url=thumb_url)
 
         # Compute groups and add fields
         groups = group_participants(participants)

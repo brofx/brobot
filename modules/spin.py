@@ -242,6 +242,7 @@ class ResultShareView(discord.ui.View):
     @discord.ui.button(label="📣 Share to thread", style=discord.ButtonStyle.secondary, custom_id="slots:share_result")
     async def share(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.author_id:
+            logger.warning(f"!!! Share user mismatch !!! interaction.user.id: {interaction.user.id}, self.author_id: {self.author_id}")
             return await interaction.response.send_message("Only the original spinner can share this result.", ephemeral=True)
         if not self.thread_id:
             return await interaction.response.send_message("Share thread is not configured.", ephemeral=True)
@@ -267,7 +268,8 @@ class ResultShareView(discord.ui.View):
         try:
             await channel.send(content=f"Spin by <@{self.author_id}>", embed=embed)
             await interaction.response.send_message("Shared to the thread. 📣", ephemeral=True)
-        except Exception:
+        except Exception as error:
+            logger.error(f"Error sharing: %s", error, exc_info=True)
             await interaction.response.send_message("Couldn't post to the thread (permissions/archived?).", ephemeral=True)
 
 class SlotsCog(commands.Cog):

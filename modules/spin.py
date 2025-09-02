@@ -1231,6 +1231,20 @@ class SlotsCog(commands.Cog):
             if info and amt > 0:
                 breakdown.append(f"Col {c+1}: {info}")
 
+        # ↘ primary diagonal
+        diag1 = [grid[i][i] for i in range(size)]
+        amt, info = score_line(diag1)
+        total_base += amt
+        if info and amt > 0:
+            breakdown.append(f"Diag ↘: {info}")
+
+        # ↙ anti-diagonal
+        diag2 = [grid[i][size - 1 - i] for i in range(size)]
+        amt, info = score_line(diag2)
+        total_base += amt
+        if info and amt > 0:
+            breakdown.append(f"Diag ↙: {info}")
+        
         # Multipliers in-grid
         grid_mult = 1
         for it in (cell for row in grid for cell in row):

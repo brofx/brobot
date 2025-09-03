@@ -363,7 +363,7 @@ class SlotsCog(commands.Cog):
         await self._refresh_channel_message()
         await ctx.reply("Slots config reloaded and message refreshed. ✅", mention_author=False)
 
-    @commands.command(name="refill_spins", help="Refill NORMAL spins to max (3) for all tracked users and reset today's MEGA spin usage. (manage_guild)")
+    @commands.command(name="refill_spins", help="Refill NORMAL spins to max for all tracked users and reset today's MEGA spin usage. (manage_guild)")
     @commands.has_guild_permissions(manage_guild=True)
     @commands.guild_only()
     async def refill_spins(self, ctx: commands.Context):
@@ -1276,8 +1276,9 @@ class SlotsCog(commands.Cog):
                 uid = int(uid_str)
                 spins = int(spins_map.get(uid_str, "0"))
                 total_wins = int(win_map.get(uid_str, str(int(score))))  # fallback to zset score if hash missing
-                avg = (total_wins / spins) if spins > 0 else 0.0
-                lb_lines.append(f"`{i:>2}.` <@{uid}> — **{total_wins:,}** | spins: **{spins}** | avg: **{avg:,.2f}**")
+                formatted_total = f"{total_wins:.3e}" if total_wins > 1_000_000_000_000 else f"{total_wins:,}"
+                #avg = (total_wins / spins) if spins > 0 else 0.0
+                lb_lines.append(f"`{i:>2}.` <@{uid}> — **{formatted_total}** | spins: **{spins}**")
         else:
             lb_lines.append("_No entries yet._")
 
@@ -1341,7 +1342,7 @@ class SlotsCog(commands.Cog):
                 w = int(wins_map.get(uid, 0))
                 l = int(loss_map.get(uid, 0))
                 total = w + l
-                if total <= 0:
+                if total <= 3: # Min num of games
                     continue
                 rate = w / total
                 rows.append((uid, w, l, rate))

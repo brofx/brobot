@@ -1323,6 +1323,7 @@ class SlotsCog(commands.Cog):
 
         # last_cfg_date = await self.r.get(K_CONFIG_DATE)
         pool_val = int(await self.r.get(K_JACKPOT_POOL) or 0)
+        pool_fmtd = fmt_spin_value(pool_val)
         embed = discord.Embed(
             title=f"{cfg.title} — Daily limit: {MEGA_SPINS_PER_DAY} MEGA spins/user",
             description=cfg.instructions,
@@ -1331,7 +1332,7 @@ class SlotsCog(commands.Cog):
         )
         reset_ts = next_midnight_et_epoch()
         embed.add_field(name="Next MEGA spin refill", value=f"<t:{reset_ts}:R>", inline=False)        
-        embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_val:,}\n**+0.5%** per normal spin", inline=False)
+        embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_fmtd}\n**+0.5%** per normal spin", inline=False)
         embed.add_field(name=f"Leaderboard (Top {LEADERBOARD_LEN})", value="\n".join(lb_lines), inline=False)
         embed.add_field(name=f"Biggest Spins (Top {BIGGEST_SPINS_LEN})", value="\n".join(big_lines), inline=False)
         embed.add_field(name="Recent Big Wins", value="\n".join(feed_lines), inline=False)

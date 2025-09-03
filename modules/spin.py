@@ -1332,7 +1332,7 @@ class SlotsCog(commands.Cog):
         )
         reset_ts = next_midnight_et_epoch()
         embed.add_field(name="Next MEGA spin refill", value=f"<t:{reset_ts}:R>", inline=False)        
-        embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_fmtd}\n**+0.5%** per normal spin", inline=False)
+        embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_val:,} ({pool_fmtd})\n**+0.5%** per normal spin", inline=False)
         embed.add_field(name=f"Leaderboard (Top {LEADERBOARD_LEN})", value="\n".join(lb_lines), inline=False)
         embed.add_field(name=f"Biggest Spins (Top {BIGGEST_SPINS_LEN})", value="\n".join(big_lines), inline=False)
         embed.add_field(name="Recent Big Wins", value="\n".join(feed_lines), inline=False)
@@ -1358,7 +1358,7 @@ class SlotsCog(commands.Cog):
         else:
             duel_lines.append("_No duels yet._")
 
-        embed.add_field(name="1v1 Leaderboard (Win Rate)", value="\n".join(duel_lines), inline=False)
+        embed.add_field(name="1v1 Leaderboard", value="\n".join(duel_lines), inline=False)
         return embed
 
     async def _refresh_channel_message(self):

@@ -107,6 +107,9 @@ def next_midnight_et_epoch() -> int:
     next_midnight = datetime.combine(next_day, dtime(0, 0, 0), tzinfo=NY_TZ)
     return int(next_midnight.timestamp())
 
+def fmt_spin_value(spin_value: int):
+    return f"{spin_value:.3e}" if spin_value > 1_000_000_000_000 else f"{spin_value:,}"
+
 @dataclass
 class Item:
     key: str
@@ -1276,7 +1279,7 @@ class SlotsCog(commands.Cog):
                 uid = int(uid_str)
                 spins = int(spins_map.get(uid_str, "0"))
                 total_wins = int(win_map.get(uid_str, str(int(score))))  # fallback to zset score if hash missing
-                formatted_total = f"{total_wins:.3e}" if total_wins > 1_000_000_000_000 else f"{total_wins:,}"
+                formatted_total = fmt_spin_value(total_wins)
                 #avg = (total_wins / spins) if spins > 0 else 0.0
                 lb_lines.append(f"`{i:>2}.` <@{uid}> — **{formatted_total}** | spins: **{spins}**")
         else:
@@ -1290,11 +1293,12 @@ class SlotsCog(commands.Cog):
                     obj = json.loads(member)
                     uid = int(obj.get("user_id", 0))
                     amt = int(obj.get("amount", int(score)))
+                    amt_fmtd = fmt_spin_value(amt)
                     utc_sec = int(obj.get("utc_sec", 0))
                     mega_tag = " • **MEGA**" if obj.get("mega") else ""
                     # relative timestamp like your Big Wins feed: <t:...:R>
                     when = f"<t:{utc_sec}:R>" if utc_sec > 0 else ""
-                    big_lines.append(f"`{i:>2}.` <@{uid}> — **{amt:,}** • {when}{mega_tag}")
+                    big_lines.append(f"`{i:>2}.` <@{uid}> — **{amt_fmtd}** • {when}{mega_tag}")
                 except Exception:
                     continue
         else:
@@ -1311,7 +1315,7 @@ class SlotsCog(commands.Cog):
                         feed_timestamp = f"<t:{obj["utc_sec"]}:R>"
                     else:
                         feed_timestamp = f"on {obj.get('date', '')}"
-                    feed_lines.append(f"🎉 <@{obj['user_id']}> won **{int(obj['amount']):,}** {feed_timestamp}")
+                    feed_lines.append(f"🎉 <@{obj['user_id']}> won **{fmt_spin_value(int(obj['amount']))}** {feed_timestamp}")
                 except Exception:
                     continue
         else:

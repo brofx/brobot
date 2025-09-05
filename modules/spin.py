@@ -76,6 +76,8 @@ K_JACKPOT_POOL = "slots:jackpot:pool"
 K_NORMAL_TOKENS = "slots:ntokens:{user_id}"  # int 0..3
 K_NORMAL_LAST   = "slots:nlast:{user_id}"    # epoch seconds of last refill calc
 K_BIGGEST_SPINS = "slots:biggest_spins"
+K_BIGGEST_SPINS_MEGA = "slots:biggest_spins:mega"
+K_BIGGEST_SPINS_NORMAL = "slots:biggest_spins:normal"
 K_DUEL_REQ = "slots:duel:req:{message_id}"      # JSON: open duel request
 K_DUEL_ACTIVE_BY_USER = "slots:duel:active_by_user"  # hash user_id -> message_id
 K_DUEL_LOCK = "slots:duel:lock:{message_id}"    # simple accept lock
@@ -417,7 +419,10 @@ class SlotsCog(commands.Cog):
             K_BIGWINS,
             K_JACKPOT_POOL,
             K_DUEL_WINS, 
-            K_DUEL_LOSSES
+            K_DUEL_LOSSES,
+            K_BIGGEST_SPINS,          # legacy
+            K_BIGGEST_SPINS_MEGA,     # new
+            K_BIGGEST_SPINS_NORMAL
         )
 
         try:
@@ -645,12 +650,20 @@ class SlotsCog(commands.Cog):
             member = json.dumps(biggest_entry, separators=(",", ":"))
             await self.r.zadd(K_BIGGEST_SPINS, {member: net_delta})
 
-            # keep only the top ~200 to bound memory (optional)
-            max_keep = 200
-            total = await self.r.zcard(K_BIGGEST_SPINS)
-            remove_n = total - max_keep
-            if remove_n > 0:
-                await self.r.zremrangebyrank(K_BIGGEST_SPINS, 0, remove_n - 1)
+            if mega:
+                await self.r.zadd(K_BIGGEST_SPINS_MEGA, {member: net_delta})
+            else:
+                await self.r.zadd(K_BIGGEST_SPINS_NORMAL, {member: net_delta})
+
+            # trim to top ~200 for each set
+            async def _trim_top200(key: str):
+                total = await self.r.zcard(key)
+                remove_n = total - 200
+                if remove_n > 0:
+                    await self.r.zremrangebyrank(key, 0, remove_n - 1)
+
+            await _trim_top200(K_BIGGEST_SPINS)
+            await _trim_top200(K_BIGGEST_SPINS_MEGA if mega else K_BIGGEST_SPINS_NORMAL)
 
         # Big-wins feed uses net
         if net_delta >= cfg.big_win_threshold or jackpot_award > 0:
@@ -1259,6 +1272,8 @@ class SlotsCog(commands.Cog):
         total_after = int(total_base * total_mult)
 
         return grid, total_after, breakdown, mult_used, grid_mult, total_mult
+    
+
 
     # ---------------- Persistent channel message ----------------
 
@@ -1285,24 +1300,58 @@ class SlotsCog(commands.Cog):
         else:
             lb_lines.append("_No entries yet._")
 
-        biggest = await self.r.zrevrange(K_BIGGEST_SPINS, 0, BIGGEST_SPINS_LEN - 1, withscores=True)
-        big_lines: List[str] = []
-        if biggest:
-            for i, (member, score) in enumerate(biggest, start=1):
+        # Helper to render a zset into lines
+        async def _render_big_list(key: str, title_suffix: str) -> Tuple[str, List[str]]:
+            items = await self.r.zrevrange(key, 0, BIGGEST_SPINS_LEN - 1, withscores=True)
+            lines: List[str] = []
+            if items:
+                for i, (member, score) in enumerate(items, start=1):
+                    try:
+                        obj = json.loads(member)
+                        uid = int(obj.get("user_id", 0))
+                        amt = int(obj.get("amount", int(score)))
+                        amt_fmtd = fmt_spin_value(amt)
+                        utc_sec = int(obj.get("utc_sec", 0))
+                        when = f"<t:{utc_sec}:R>" if utc_sec > 0 else ""
+                        lines.append(f"`{i:>2}.` <@{uid}> — **{amt_fmtd}** • {when}")
+                    except Exception:
+                        continue
+            else:
+                lines.append("_No spins recorded yet._")
+            return title_suffix, lines
+
+        mega_title, mega_lines = await _render_big_list(K_BIGGEST_SPINS_MEGA, f"Biggest MEGA Spins (Top {BIGGEST_SPINS_LEN})")
+        norm_title, norm_lines = await _render_big_list(K_BIGGEST_SPINS_NORMAL, f"Biggest Normal Spins (Top {BIGGEST_SPINS_LEN})")
+
+        # Fallback: if both new sets are empty but the legacy set has data, split it on the fly
+        if (len(mega_lines) == 1 and "No spins" in mega_lines[0]) and (len(norm_lines) == 1 and "No spins" in norm_lines[0]):
+            legacy = await self.r.zrevrange(K_BIGGEST_SPINS, 0, 199, withscores=True)  # up to 200, then we’ll slice
+            mega_buf: List[Tuple[str, float]] = []
+            norm_buf: List[Tuple[str, float]] = []
+            for member, score in legacy:
                 try:
+                    obj = json.loads(member)
+                    if obj.get("mega"):
+                        mega_buf.append((member, score))
+                    else:
+                        norm_buf.append((member, score))
+                except Exception:
+                    continue
+
+            def fmt_split(buf: List[Tuple[str, float]]) -> List[str]:
+                out = []
+                for i, (member, score) in enumerate(buf[:BIGGEST_SPINS_LEN], start=1):
                     obj = json.loads(member)
                     uid = int(obj.get("user_id", 0))
                     amt = int(obj.get("amount", int(score)))
                     amt_fmtd = fmt_spin_value(amt)
                     utc_sec = int(obj.get("utc_sec", 0))
-                    mega_tag = " • **MEGA**" if obj.get("mega") else ""
-                    # relative timestamp like your Big Wins feed: <t:...:R>
                     when = f"<t:{utc_sec}:R>" if utc_sec > 0 else ""
-                    big_lines.append(f"`{i:>2}.` <@{uid}> — **{amt_fmtd}** • {when}{mega_tag}")
-                except Exception:
-                    continue
-        else:
-            big_lines.append("_No spins recorded yet._")
+                    out.append(f"`{i:>2}.` <@{uid}> — **{amt_fmtd}** • {when}")
+                return out or ["_No spins recorded yet._"]
+
+            mega_lines = fmt_split(mega_buf)
+            norm_lines = fmt_split(norm_buf)
 
         # Big wins feed (most recent first)
         feed_raw = await self.r.lrange(K_BIGWINS, 0, BIGWINS_FEED_LEN-1)
@@ -1334,7 +1383,8 @@ class SlotsCog(commands.Cog):
         embed.add_field(name="Next MEGA spin refill", value=f"<t:{reset_ts}:R>", inline=False)        
         embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_val:,} ({pool_fmtd})\n**+0.5%** per normal spin", inline=False)
         embed.add_field(name=f"Leaderboard (Top {LEADERBOARD_LEN})", value="\n".join(lb_lines), inline=False)
-        embed.add_field(name=f"Biggest Spins (Top {BIGGEST_SPINS_LEN})", value="\n".join(big_lines), inline=False)
+        embed.add_field(name=mega_title, value="\n".join(mega_lines), inline=False)
+        embed.add_field(name=norm_title, value="\n".join(norm_lines), inline=False)
         embed.add_field(name="Recent Big Wins", value="\n".join(feed_lines), inline=False)
         wins_map = await self.r.hgetall(K_DUEL_WINS)
         loss_map = await self.r.hgetall(K_DUEL_LOSSES)

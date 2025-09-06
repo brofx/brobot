@@ -1382,7 +1382,7 @@ class SlotsCog(commands.Cog):
         reset_ts = next_midnight_et_epoch()
         embed = discord.Embed(
             title=cfg.title,
-            description=cfg.instructions + f", MEGA spins refill <t:{reset_ts}:R>.",
+            description=cfg.instructions + f", refills <t:{reset_ts}:R>.",
             color=discord.Color.gold(),
             timestamp=datetime.now(tz=NY_TZ)
         )

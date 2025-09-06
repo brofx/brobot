@@ -1386,7 +1386,7 @@ class SlotsCog(commands.Cog):
             color=discord.Color.gold(),
             timestamp=datetime.now(tz=NY_TZ)
         )
-        embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_val:,} ({pool_fmtd})\n**+{JACKPOT_NORMAL_INC_FRACTION * 100}%** per normal spin", inline=False)
+        embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_val:,} (**{pool_fmtd}**)\n**+{JACKPOT_NORMAL_INC_FRACTION * 100}%** per normal spin", inline=False)
         embed.add_field(name=f"Leaderboard (Top {LEADERBOARD_LEN})", value="\n".join(lb_lines), inline=False)
         embed.add_field(name=mega_title, value="\n".join(mega_lines), inline=False)
         embed.add_field(name=norm_title, value="\n".join(norm_lines), inline=False)

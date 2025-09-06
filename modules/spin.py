@@ -55,14 +55,15 @@ COOLDOWN_SECONDS = 300  # 5 minutes
 MEGA_SPINS_PER_DAY = 5
 MEGA_MIN_POINTS = 1000
 MEGA_COST_FRACTION = 0.10
-MEGA_PAYOUT_MULT = 3.69  # global multiplier applied to the spin total when using MEGA
+MEGA_PAYOUT_MULT = 4.20  # global multiplier applied to the spin total when using MEGA
+JACKPOT_NORMAL_INC_FRACTION = 0.015 # 1.5%
 JACKPOT_MIN_MATCHES = 20
 COOLDOWN_SECONDS = 300  # 5 minutes
 NORMAL_TOKENS_CAP = 6   # up to 5 stored normal spins
 BIGGEST_SPINS_LEN = 5
 DUEL_TIMEOUT_SECONDS = 60 * 60 # 1 Hour
-DUEL_FEE_FRACTION = 0.05  # 5%
-DUEL_LEADERBOARD_LEN = 10
+DUEL_FEE_FRACTION = 0.10  # 5%
+DUEL_LEADERBOARD_LEN = 5
 
 # Redis keys
 K_MESSAGE_ID = "slots:message_id"
@@ -568,7 +569,7 @@ class SlotsCog(commands.Cog):
                 jackpot_award = 0
 
             if jackpot_award > 0:
-                await self.r.set(K_JACKPOT_POOL, int(jackpot_award * 1.005))
+                await self.r.set(K_JACKPOT_POOL, int(jackpot_award * (1 + JACKPOT_NORMAL_INC_FRACTION)))
         else:
             # MEGA spin: enforce per-day count and cost
             mkey = mega_plays_key(user.id, date_str)
@@ -1373,15 +1374,14 @@ class SlotsCog(commands.Cog):
         # last_cfg_date = await self.r.get(K_CONFIG_DATE)
         pool_val = int(await self.r.get(K_JACKPOT_POOL) or 0)
         pool_fmtd = fmt_spin_value(pool_val)
+        reset_ts = next_midnight_et_epoch()
         embed = discord.Embed(
             title=f"{cfg.title} — Daily limit: {MEGA_SPINS_PER_DAY} MEGA spins/user",
-            description=cfg.instructions,
+            description=cfg.instructions + f"\nNext MEGA spin refill <t:{reset_ts}:R>",
             color=discord.Color.gold(),
             timestamp=datetime.now(tz=NY_TZ)
         )
-        reset_ts = next_midnight_et_epoch()
-        embed.add_field(name="Next MEGA spin refill", value=f"<t:{reset_ts}:R>", inline=False)        
-        embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_val:,} ({pool_fmtd})\n**+0.5%** per normal spin", inline=False)
+        embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_val:,} ({pool_fmtd})\n**+{JACKPOT_NORMAL_INC_FRACTION * 100}%** per normal spin", inline=False)
         embed.add_field(name=f"Leaderboard (Top {LEADERBOARD_LEN})", value="\n".join(lb_lines), inline=False)
         embed.add_field(name=mega_title, value="\n".join(mega_lines), inline=False)
         embed.add_field(name=norm_title, value="\n".join(norm_lines), inline=False)

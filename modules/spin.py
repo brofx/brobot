@@ -739,7 +739,7 @@ class SlotsCog(commands.Cog):
         if jackpot_award > 0:
             desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:,}")
         elif jackpot_contribution:
-            desc_lines.append(f"> {fmt_spin_value(jackpot_contribution)} added to jackpot")
+            desc_lines.append(f"*{fmt_spin_value(jackpot_contribution)} added to jackpot*")
         
         embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
         embed.timestamp = spin_time

@@ -1376,8 +1376,8 @@ class SlotsCog(commands.Cog):
         pool_fmtd = fmt_spin_value(pool_val)
         reset_ts = next_midnight_et_epoch()
         embed = discord.Embed(
-            title=f"{cfg.title} — Daily limit: {MEGA_SPINS_PER_DAY} MEGA spins/user",
-            description=cfg.instructions + f"\nNext MEGA spin refill <t:{reset_ts}:R>",
+            title=cfg.title,
+            description=cfg.instructions + f", MEGA spins refill <t:{reset_ts}:R>.",
             color=discord.Color.gold(),
             timestamp=datetime.now(tz=NY_TZ)
         )

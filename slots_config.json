@@ -1,6 +1,6 @@
 {
   "title": "BRFX Spin2Win",
-  "instructions": "Press **Spin** for a normal play (5×5). **3+ matching symbols** pay **base value × match count**; wilds (<:brfx_shiny:1408107455237586964>) substitute. Multipliers (<:multi2:1407887874829058169><:multi5:1407888377189105995><:multi10:1407888665044189224><:multi25:1407887742356029511><:multi50:1407889801985785876><:multi100:1407889564785184829><:multi1000:1407889561723343011>) anywhere **stack and multiply your total**.\n\n🎰 1 Normal spin every **5 minutes** (stacks up to 6).\n\n**🤖 5 MEGA Spins **per day**, resets midnight ET (America/New_York).",
+  "instructions": "Press **Spin** for a normal play (5×5). **3+ matching symbols** pay **base value × match count**; wilds (<:brfx_shiny:1408107455237586964>) substitute. Multipliers (<:multi2:1407887874829058169><:multi5:1407888377189105995><:multi10:1407888665044189224><:multi25:1407887742356029511><:multi50:1407889801985785876><:multi100:1407889564785184829><:multi1000:1407889561723343011>) anywhere **stack and multiply your total**.\n\n🎰 **1 Normal** spin **every 5 minutes** (stacks up to 6).\n\n🤖 **5 MEGA** spins **per day**",
   "big_win_threshold": 100000000,
   "items": [
     { "key": "wild", "emoji_id": 1408107455237586964, "emoji_name": "brfx_shiny", "emoji_animated": false, "weight": 10, "base_value": 150, "is_wild": true },

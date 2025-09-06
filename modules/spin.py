@@ -715,6 +715,9 @@ class SlotsCog(commands.Cog):
                 pipe = self.r.pipeline()
                 pipe.hincrbyfloat(K_STATS_WINNINGS, uid, escrow)
                 pipe.zincrby(K_LEADERBOARD, escrow, uid)
+                await pipe.execute()
+                escrow = 0  # fully returned to user (and more)
+                
                 # refill one MEGA use (reduce today's used if > 0)
                 mkey = mega_plays_key(int(uid), ny_date_str())
                 used = int(await self.r.get(mkey) or 0)

@@ -50,7 +50,7 @@
     "wheel": [
       { "id": "refund_refill_mega", "label": "Refund cost + refill MEGA",              "weight": 16 },
       { "id": "refund_plus_half",   "label": "Refund cost + 50%",                      "weight": 16, "bonus_fraction": 0.5 },
-      { "id": "refund_double",      "label": "Refund cost ×2",                         "weight": 8  },
+      { "id": "refund_double",      "label": "Refund cost ×2",                         "weight": 8, "bonus_fraction": 1.0  },
       { "id": "spread_cost_others", "label": "Spread the cost among all other players","weight": 6  },
       { "id": "share_entire_bal",   "label": "Share entire balance (cost refunded)",   "weight": 2  }
     ]

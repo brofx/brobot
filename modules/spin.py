@@ -255,7 +255,7 @@ class DuelAcceptView(discord.ui.View):
             fee = int(self.initiator_fee)
             if fee > 0:
                 pipe = self.cog.r.pipeline()
-                pipe.hincrby(K_STATS_WINNINGS, uid, fee)
+                pipe.hincrbyfloat(K_STATS_WINNINGS, uid, fee)
                 pipe.zincrby(K_LEADERBOARD, fee, uid)
                 pipe.hdel(K_DUEL_ACTIVE_BY_USER, uid)
                 await pipe.execute()
@@ -578,13 +578,13 @@ class SlotsCog(commands.Cog):
 
             # Refund initiator fee
             if initiator_id and initiator_fee > 0:
-                pipe.hincrby(K_STATS_WINNINGS, str(initiator_id), initiator_fee)
+                pipe.hincrbyfloat(K_STATS_WINNINGS, str(initiator_id), initiator_fee)
                 pipe.zincrby(K_LEADERBOARD, initiator_fee, str(initiator_id))
                 refunded_initiators += 1
 
             # If accepted, also refund opponent (same fee as initiator)
             if state == "accepted" and opponent_id and initiator_fee > 0:
-                pipe.hincrby(K_STATS_WINNINGS, str(opponent_id), initiator_fee)
+                pipe.hincrbyfloat(K_STATS_WINNINGS, str(opponent_id), initiator_fee)
                 pipe.zincrby(K_LEADERBOARD, initiator_fee, str(opponent_id))
                 refunded_opponents += 1
 
@@ -695,7 +695,7 @@ class SlotsCog(commands.Cog):
 
             # Deduct escrow
             pipe = self.r.pipeline()
-            pipe.hincrby(K_STATS_WINNINGS, uid, -cost)
+            pipe.hincrbyfloat(K_STATS_WINNINGS, uid, -cost)
             pipe.zincrby(K_LEADERBOARD, -cost, uid)
             await pipe.execute()
             escrow = cost
@@ -713,7 +713,7 @@ class SlotsCog(commands.Cog):
             if choice_id == "refund_refill_mega":
                 # refund escrow
                 pipe = self.r.pipeline()
-                pipe.hincrby(K_STATS_WINNINGS, uid, escrow)
+                pipe.hincrbyfloat(K_STATS_WINNINGS, uid, escrow)
                 pipe.zincrby(K_LEADERBOARD, escrow, uid)
                 # refill one MEGA use (reduce today's used if > 0)
                 mkey = mega_plays_key(int(uid), ny_date_str())
@@ -726,7 +726,7 @@ class SlotsCog(commands.Cog):
                 bonus_fraction = chosen.params.get("bonus_fraction", 0.5)
                 bonus = int(escrow * bonus_fraction)
                 pipe = self.r.pipeline()
-                pipe.hincrby(K_STATS_WINNINGS, uid, escrow + bonus)
+                pipe.hincrbyfloat(K_STATS_WINNINGS, uid, escrow + bonus)
                 pipe.zincrby(K_LEADERBOARD, escrow + bonus, uid)
                 await pipe.execute()
                 escrow = 0  # fully returned to user (and more)
@@ -741,7 +741,7 @@ class SlotsCog(commands.Cog):
                 else:
                     # no one else to share with → refund
                     pipe = self.r.pipeline()
-                    pipe.hincrby(K_STATS_WINNINGS, uid, cost)
+                    pipe.hincrbyfloat(K_STATS_WINNINGS, uid, cost)
                     pipe.zincrby(K_LEADERBOARD, cost, uid)
                     await pipe.execute()
                     summary_lines.append("Outcome: **No recipients** — cost refunded.")
@@ -752,7 +752,7 @@ class SlotsCog(commands.Cog):
                 bal_after = int(await self.r.hget(K_STATS_WINNINGS, uid) or 0)
                 # Refund escrow
                 pipe = self.r.pipeline()
-                pipe.hincrby(K_STATS_WINNINGS, uid, escrow)
+                pipe.hincrbyfloat(K_STATS_WINNINGS, uid, escrow)
                 pipe.zincrby(K_LEADERBOARD, escrow, uid)
                 await pipe.execute()
                 escrow = 0
@@ -762,7 +762,7 @@ class SlotsCog(commands.Cog):
                 if bal_total > 0:
                     # Set to zero, and distribute bal_total to others
                     pipe = self.r.pipeline()
-                    pipe.hincrby(K_STATS_WINNINGS, uid, -bal_total)
+                    pipe.hincrbyfloat(K_STATS_WINNINGS, uid, -bal_total)
                     pipe.zincrby(K_LEADERBOARD, -bal_total, uid)
                     await pipe.execute()
 
@@ -876,7 +876,7 @@ class SlotsCog(commands.Cog):
         pipe = self.r.pipeline()
         for rid in recipients:
             s = str(rid)
-            pipe.hincrby(K_STATS_WINNINGS, s, per)
+            pipe.hincrbyfloat(K_STATS_WINNINGS, s, per)
             pipe.zincrby(K_LEADERBOARD, per, s)
         await pipe.execute()
 
@@ -942,7 +942,7 @@ class SlotsCog(commands.Cog):
 
             # Deduct cost up-front and add to the progressive jackpot
             pipe = self.r.pipeline()
-            pipe.hincrby(K_STATS_WINNINGS, user_id, -cost)
+            pipe.hincrbyfloat(K_STATS_WINNINGS, user_id, -cost)
             pipe.zincrby(K_LEADERBOARD, -cost, user_id)
             pipe.incrbyfloat(K_JACKPOT_POOL, cost)
             await pipe.execute()
@@ -987,7 +987,7 @@ class SlotsCog(commands.Cog):
         if mega:
             await self.r.hincrby(K_STATS_SPINS_MEGA, user_id, 1)
         if gross_total:
-            await self.r.hincrby(K_STATS_WINNINGS, user_id, gross_total)
+            await self.r.hincrbyfloat(K_STATS_WINNINGS, user_id, gross_total)
             await self.r.zincrby(K_LEADERBOARD, gross_total, user_id)
 
         user_name = getattr(interaction.user, "global_name", None) or interaction.user.name
@@ -1148,7 +1148,7 @@ class SlotsCog(commands.Cog):
 
         # Deduct initiator's fee now
         pipe = self.r.pipeline()
-        pipe.hincrby(K_STATS_WINNINGS, uid, -init_fee)
+        pipe.hincrbyfloat(K_STATS_WINNINGS, uid, -init_fee)
         pipe.zincrby(K_LEADERBOARD, -init_fee, uid)
         await pipe.execute()
 
@@ -1230,7 +1230,7 @@ class SlotsCog(commands.Cog):
 
         # Deduct opponent fee now
         pipe = self.r.pipeline()
-        pipe.hincrby(K_STATS_WINNINGS, opp_uid, -init_fee)
+        pipe.hincrbyfloat(K_STATS_WINNINGS, opp_uid, -init_fee)
         pipe.zincrby(K_LEADERBOARD, -init_fee, opp_uid)
         await pipe.execute()
 
@@ -1285,14 +1285,14 @@ class SlotsCog(commands.Cog):
         if split:
             share = winner_payout // 2
             pipe = self.r.pipeline()
-            pipe.hincrby(K_STATS_WINNINGS, str(initiator_id), share)
-            pipe.hincrby(K_STATS_WINNINGS, opp_uid, share)
+            pipe.hincrbyfloat(K_STATS_WINNINGS, str(initiator_id), share)
+            pipe.hincrbyfloat(K_STATS_WINNINGS, opp_uid, share)
             pipe.zincrby(K_LEADERBOARD, share, str(initiator_id))
             pipe.zincrby(K_LEADERBOARD, share, opp_uid)
             await pipe.execute()
         else:
             pipe = self.r.pipeline()
-            pipe.hincrby(K_STATS_WINNINGS, str(winner_id), winner_payout)
+            pipe.hincrbyfloat(K_STATS_WINNINGS, str(winner_id), winner_payout)
             pipe.zincrby(K_LEADERBOARD, winner_payout, str(winner_id))
             pipe.hincrby(K_DUEL_WINS, str(winner_id), 1)
             pipe.hincrby(K_DUEL_LOSSES, str(loser_id), 1)
@@ -1403,7 +1403,7 @@ class SlotsCog(commands.Cog):
         uid = str(view.initiator_id)
         fee = int(obj.get("initiator_fee", view.initiator_fee))
         pipe = self.r.pipeline()
-        pipe.hincrby(K_STATS_WINNINGS, uid, fee)
+        pipe.hincrbyfloat(K_STATS_WINNINGS, uid, fee)
         pipe.zincrby(K_LEADERBOARD, fee, uid)
         pipe.hdel(K_DUEL_ACTIVE_BY_USER, uid)
         pipe.delete(view.duel_key)

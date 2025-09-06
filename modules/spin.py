@@ -84,6 +84,9 @@ K_DUEL_ACTIVE_BY_USER = "slots:duel:active_by_user"  # hash user_id -> message_i
 K_DUEL_LOCK = "slots:duel:lock:{message_id}"    # simple accept lock
 K_DUEL_WINS = "slots:duel:wins"                 # hash user_id -> wins
 K_DUEL_LOSSES = "slots:duel:losses"             # hash user_id -> losses
+K_SIGMA_TOKENS = "slots:sigma:tokens:{user_id}"
+K_SIGMA_LAST   = "slots:sigma:last:{user_id}"
+K_SIGMA_LOCK   = "slots:sigma:lock:{user_id}"   # short TTL lock to prevent double submits
 
 # Optional: track mega spins separately
 K_STATS_SPINS_MEGA = "slots:stats:spins_mega"      # hash user_id -> total mega spins
@@ -137,11 +140,28 @@ class Item:
         return self.emoji or ""
 
 @dataclass
+class SigmaOutcome:
+    id: str
+    label: str
+    weight: float
+    params: Dict[str, Any]
+
+@dataclass
+class SigmaConfig:
+    enabled: bool
+    cost_fraction: float
+    min_points: int
+    cooldown_seconds: int
+    tokens_cap: int
+    wheel: List[SigmaOutcome]
+
+@dataclass
 class SlotsConfig:
     title: str
     instructions: str
     items: List[Item]
     big_win_threshold: int
+    sigma: Optional[SigmaConfig] = None
 
 class SlotsSpinView(discord.ui.View):
     def __init__(self, *, timeout: Optional[float] = None):
@@ -161,12 +181,50 @@ class SlotsSpinView(discord.ui.View):
             return await interaction.response.send_message("Slots are temporarily unavailable.", ephemeral=True)
         await cog.handle_spin(interaction, mega=True)
 
+    @discord.ui.button(label="Σ Sigma", style=discord.ButtonStyle.secondary, custom_id="slots:sigma:open")
+    async def sigma_open(self, interaction: discord.Interaction, button: discord.ui.Button):
+        cog: "SlotsCog" = interaction.client.get_cog("SlotsCog")  # type: ignore
+        if not cog:
+            return await interaction.response.send_message("Slots are temporarily unavailable.", ephemeral=True)
+        await cog.sigma_open_confirm(interaction)
+
     @discord.ui.button(label="🗡️ 1v1", style=discord.ButtonStyle.secondary, custom_id="slots:duel:new")
     async def duel_new(self, interaction: discord.Interaction, button: discord.ui.Button):
         cog: "SlotsCog" = interaction.client.get_cog("SlotsCog")  # type: ignore
         if not cog:
             return await interaction.response.send_message("Slots are temporarily unavailable.", ephemeral=True)
         await cog.start_duel(interaction)
+
+
+class SigmaConfirmView(discord.ui.View):
+    def __init__(self, cog: "SlotsCog", user_id: int, est_cost: int, expires_at: int):
+        super().__init__(timeout=60)
+        self.cog = cog
+        self.user_id = user_id
+        self.est_cost = est_cost
+        self.expires_at = expires_at
+
+    async def on_timeout(self):
+        # silently disable buttons when the ephemeral confirm expires
+        for item in self.children:
+            item.disabled = True
+
+    @discord.ui.button(label="Spin Sigma", style=discord.ButtonStyle.primary, custom_id="slots:sigma:confirm")
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.handle_sigma_spin(interaction)
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, custom_id="slots:sigma:cancel")
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        for item in self.children:
+            item.disabled = True
+        try:
+            await interaction.response.edit_message(content="Σ Sigma cancelled.", view=self)
+        except Exception:
+            try:
+                await interaction.response.send_message("Σ Sigma cancelled.", ephemeral=True)
+            except Exception:
+                pass
+
 
 class DuelAcceptView(discord.ui.View):
     def __init__(self, cog: "SlotsCog", *, message_id: int, channel_id: int, duel_key: str, initiator_id: int, initiator_fee: int, expires_at: int):
@@ -317,12 +375,35 @@ class SlotsCog(commands.Cog):
                 emoji_name=it.get("emoji_name"),
                 emoji_animated=bool(it.get("emoji_animated", False)),
             ))
-
+        raw_sigma = raw.get("sigma") or {}
+        wheel = []
+        for w in raw_sigma.get("wheel", []):
+            wheel.append(SigmaOutcome(
+                id=w["id"],
+                label=w.get("label", w["id"]),
+                weight=float(w.get("weight", 1)),
+                params={k:v for k,v in w.items() if k not in ("id","label","weight")}
+            ))
+        sigma_cfg = SigmaConfig(
+            enabled=bool(raw_sigma.get("enabled", True)),
+            cost_fraction=float(raw_sigma.get("cost_fraction", 0.25)),
+            min_points=int(raw_sigma.get("min_points", 1000)),
+            cooldown_seconds=int(raw_sigma.get("cooldown_seconds", 300)),
+            tokens_cap=int(raw_sigma.get("tokens_cap", 1)),
+            wheel=wheel or [
+                SigmaOutcome("refund_refill_mega","Refund cost + refill MEGA",16,{}),
+                SigmaOutcome("refund_plus_half","Refund cost + 50%",16,{"bonus_fraction":0.5}),
+                SigmaOutcome("refund_double","Refund cost ×2",8,{}),
+                SigmaOutcome("spread_cost_others","Spread the cost among all other players",6,{}),
+                SigmaOutcome("share_entire_bal","Share entire balance (cost refunded)",2,{})
+            ]
+        )
         return SlotsConfig(
             title=raw.get("title", "Slots"),
             instructions=raw.get("instructions", "Press **Spin** to play!"),
             items=items,
-            big_win_threshold=int(raw.get("big_win_threshold", 1_000))
+            big_win_threshold=int(raw.get("big_win_threshold", 1_000)),
+            sigma=sigma_cfg
         )
 
     # ---------------- Admin (prefix) commands ----------------
@@ -534,6 +615,275 @@ class SlotsCog(commands.Cog):
             f"- Skipped (already resolved/not active): **{skipped}**",
             mention_author=False
         )
+
+    async def sigma_open_confirm(self, interaction: discord.Interaction):
+        """Show an ephemeral confirmation with the outcomes & a Spin button."""
+        await self._ensure_config_for_today()
+        user = interaction.user
+        uid = str(user.id)
+        cfg = self._config
+
+        if not cfg.sigma or not cfg.sigma.enabled or not cfg.sigma.wheel:
+            return await interaction.response.send_message("Sigma is currently disabled.", ephemeral=True)
+
+        # Refill/check Sigma token
+        tokens, next_in = await self._refill_sigma_tokens(user.id)
+        if tokens <= 0:
+            now = int(datetime.now(tz=NY_TZ).timestamp())
+            return await interaction.response.send_message(
+                f"No Σ Sigma available. Next charge **<t:{now + next_in}:R>**.",
+                ephemeral=True
+            )
+
+        # Compute *estimated* cost (we will recompute on confirm)
+        points = int(await self.r.hget(K_STATS_WINNINGS, uid) or 0)
+        est_cost = max(cfg.sigma.min_points, int(points * cfg.sigma.cost_fraction))
+        if points < est_cost or est_cost <= 0:
+            return await interaction.response.send_message(
+                f"You need **≥ {cfg.sigma.min_points:,}** points and will be charged **25%** of your balance to spin.",
+                ephemeral=True
+            )
+
+        # Outcomes (weights: medium/lowish/low/very low → 16/8/6/2 mapping)
+        outcomes_hints = [x.label for x in cfg.sigma.wheel]
+
+        desc = (
+            f"Cost (escrowed): **{est_cost:,}**\n"
+            f"Cooldown: 5 minutes (cap **1**)\n\n"
+            "**Possible outcomes:**\n" + "\n".join(outcomes_hints) + "\n\n"
+            "_If an outcome refunds or spreads the cost, it comes from escrow. "
+            "Otherwise, the escrow is added to the jackpot._"
+        )
+
+        embed = discord.Embed(title="Σ Sigma Spin — Confirm", description=desc, color=discord.Color.dark_gold())
+        expires_at = int(datetime.now(tz=NY_TZ).timestamp()) + 60
+        view = SigmaConfirmView(self, user.id, est_cost, expires_at)
+        await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
+
+    async def handle_sigma_spin(self, interaction: discord.Interaction):
+        """Resolve Sigma spin after user confirms."""
+        await self._ensure_config_for_today()
+        user = interaction.user
+        uid = str(user.id)
+        now = int(datetime.now(tz=NY_TZ).timestamp())
+        cfg = self._config
+        if not cfg.sigma or not cfg.sigma.enabled or not cfg.sigma.wheel:
+            return await interaction.response.send_message("Sigma is currently disabled.", ephemeral=True)
+
+        # Lock to prevent double submits
+        lock_key = K_SIGMA_LOCK.format(user_id=user.id)
+        if not await self.r.set(lock_key, "1", ex=10, nx=True):
+            return await interaction.response.send_message("Another Sigma is already processing.", ephemeral=True)
+
+        try:
+            # Token check/consume
+            tokens, _ = await self._refill_sigma_tokens(user.id)
+            if tokens <= 0:
+                return await interaction.response.send_message("No Σ Sigma available right now.", ephemeral=True)
+            await self.r.decr(K_SIGMA_TOKENS.format(user_id=user.id))
+
+            # Recompute cost and verify eligibility
+            points = int(await self.r.hget(K_STATS_WINNINGS, uid) or 0)
+            cost = max(cfg.sigma.min_points, int(points * cfg.sigma.cost_fraction))
+            if points < cost or cost <= 0:
+                # give token back (gracefully) if they lost points meanwhile
+                await self.r.incr(K_SIGMA_TOKENS.format(user_id=user.id))
+                return await interaction.response.send_message(
+                    f"Balance changed — you need **≥ {cfg.sigma.min_points:,}** and 25% cost available.",
+                    ephemeral=True
+                )
+
+            # Deduct escrow
+            pipe = self.r.pipeline()
+            pipe.hincrby(K_STATS_WINNINGS, uid, -cost)
+            pipe.zincrby(K_LEADERBOARD, -cost, uid)
+            await pipe.execute()
+            escrow = cost
+
+            # Choose outcome (weights: 16,16,8,6,2)
+            wheel_ids = [o.id for o in cfg.sigma.wheel]
+            wheel_wts = [o.weight for o in cfg.sigma.wheel]
+            choice_id = random.choices(wheel_ids, weights=wheel_wts, k=1)[0]
+            chosen = next(o for o in cfg.sigma.wheel if o.id == choice_id)
+            
+            # Apply outcome
+            summary_lines: List[str] = []
+            share_thread_note: Optional[str] = None
+
+            if choice_id == "refund_refill_mega":
+                # refund escrow
+                pipe = self.r.pipeline()
+                pipe.hincrby(K_STATS_WINNINGS, uid, escrow)
+                pipe.zincrby(K_LEADERBOARD, escrow, uid)
+                # refill one MEGA use (reduce today's used if > 0)
+                mkey = mega_plays_key(int(uid), ny_date_str())
+                used = int(await self.r.get(mkey) or 0)
+                if used > 0:
+                    await self.r.decr(mkey)
+                summary_lines.append(f"Outcome: **Refund + refill MEGA** (+{escrow:,}, MEGA usage refunded if any).")
+
+            elif choice_id in ("refund_plus_half", "refund_double"):
+                bonus_fraction = chosen.params.get("bonus_fraction", 0.5)
+                bonus = int(escrow * bonus_fraction)
+                pipe = self.r.pipeline()
+                pipe.hincrby(K_STATS_WINNINGS, uid, escrow + bonus)
+                pipe.zincrby(K_LEADERBOARD, escrow + bonus, uid)
+                await pipe.execute()
+                escrow = 0  # fully returned to user (and more)
+                summary_lines.append(f"Outcome: **Refund + {int(bonus_fraction * 100)}%** (+{escrow + bonus:,}).")
+
+            elif choice_id == "spread_cost_others":
+                distributed, recipients = await self._sigma_spread_to_all_others(escrow, initiator_id=int(uid))
+                escrow = 0  # fully used for spread (remainder handled inside helper)
+                if recipients:
+                    summary_lines.append(f"Outcome: **Spread cost** — {distributed:,} points shared to **{len(recipients)}** others.")
+                    share_thread_note = f"Σ Sigma: <@{uid}> spread **{distributed:,}** points to **{len(recipients)}** players."
+                else:
+                    # no one else to share with → refund
+                    pipe = self.r.pipeline()
+                    pipe.hincrby(K_STATS_WINNINGS, uid, cost)
+                    pipe.zincrby(K_LEADERBOARD, cost, uid)
+                    await pipe.execute()
+                    summary_lines.append("Outcome: **No recipients** — cost refunded.")
+
+            elif choice_id == "share_entire_bal":
+                # Refund escrow to initiator, then distribute their entire remaining balance to others.
+                # Get current balance (post-escrow)
+                bal_after = int(await self.r.hget(K_STATS_WINNINGS, uid) or 0)
+                # Refund escrow
+                pipe = self.r.pipeline()
+                pipe.hincrby(K_STATS_WINNINGS, uid, escrow)
+                pipe.zincrby(K_LEADERBOARD, escrow, uid)
+                await pipe.execute()
+                escrow = 0
+
+                # Re-read (refund just applied)
+                bal_total = int(await self.r.hget(K_STATS_WINNINGS, uid) or 0)
+                if bal_total > 0:
+                    # Set to zero, and distribute bal_total to others
+                    pipe = self.r.pipeline()
+                    pipe.hincrby(K_STATS_WINNINGS, uid, -bal_total)
+                    pipe.zincrby(K_LEADERBOARD, -bal_total, uid)
+                    await pipe.execute()
+
+                    distributed, recipients = await self._sigma_spread_to_all_others(bal_total, initiator_id=int(uid))
+                    summary_lines.append(
+                        f"Outcome: **Share entire balance** — distributed {distributed:,} to {len(recipients)} others. "
+                        f"(Your cost was refunded.)"
+                    )
+                    share_thread_note = f"Σ Sigma: <@{uid}> shared their entire balance (**{distributed:,}**) to others."
+                else:
+                    summary_lines.append("Outcome: **Share entire balance** — nothing to share (balance was 0). Cost was refunded.")
+
+            # Any remaining escrow not refunded or shared → jackpot
+            if escrow > 0:
+                await self.r.incrby(K_JACKPOT_POOL, escrow)
+                summary_lines.append(f"*{escrow:,} added to jackpot.*")
+
+            # Compose ephemeral result
+            tokens_after, next_in = await self._refill_sigma_tokens(user.id)
+            next_line = ("Ready now" if tokens_after > 0 else f"Next Sigma **<t:{now + next_in}:R>**")
+
+            embed = discord.Embed(
+                title="Σ Sigma Result",
+                description="\n".join(summary_lines + [f"\n**Cooldown:** {next_line}"]),
+                color=discord.Color.dark_gold(),
+                timestamp=datetime.now(tz=NY_TZ)
+            )
+
+            # Announce to thread for global effects
+            if share_thread_note:
+                target = self.bot.get_channel(SHARE_THREAD_ID) or await self.bot.fetch_channel(SHARE_THREAD_ID)
+                if isinstance(target, (discord.Thread, discord.TextChannel)):
+                    try:
+                        await target.send(content=share_thread_note, silent=True)
+                    except Exception:
+                        pass
+
+            if interaction.response.is_done():
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            else:
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        finally:
+            try:
+                await self.r.delete(lock_key)
+            except Exception:
+                pass
+
+    async def _refill_sigma_tokens(self, user_id: int) -> Tuple[int, int]:
+        """Single-charge token bucket for Sigma (cap=1, +1 every 300s)."""
+        cfg = self._config
+        now = int(time.time())
+        tkey = K_SIGMA_TOKENS.format(user_id=user_id)
+        lkey = K_SIGMA_LAST.format(user_id=user_id)
+
+        pipe = self.r.pipeline()
+        pipe.get(tkey)
+        pipe.get(lkey)
+        cur_tokens_s, last_ts_s = await pipe.execute()
+
+        if cur_tokens_s is None or last_ts_s is None:
+            await self.r.set(tkey, cfg.sigma.tokens_cap)
+            await self.r.set(lkey, now)
+            return cfg.sigma.tokens_cap, 0
+
+        tokens = int(cur_tokens_s or 0)
+        last_ts = int(last_ts_s or now)
+
+        if tokens < cfg.sigma.tokens_cap:
+            elapsed = max(0, now - last_ts)
+            gained = elapsed // cfg.sigma.cooldown_seconds
+            if gained > 0:
+                tokens = min(cfg.sigma.tokens_cap, tokens + gained)
+                last_ts = last_ts + gained * cfg.sigma.cooldown_seconds
+                pipe = self.r.pipeline()
+                pipe.set(tkey, tokens)
+                pipe.set(lkey, last_ts)
+                await pipe.execute()
+        else:
+            # at cap, move anchor forward to avoid big deltas
+            await self.r.set(lkey, now)
+
+        if tokens >= cfg.sigma.tokens_cap:
+            next_in = 0
+        else:
+            elapsed = max(0, now - last_ts)
+            next_in = cfg.sigma.cooldown_seconds - (elapsed % cfg.sigma.cooldown_seconds)
+        return tokens, next_in
+
+    async def _sigma_spread_to_all_others(self, amount: int, *, initiator_id: int) -> Tuple[int, List[int]]:
+        """Evenly distribute 'amount' to all known users except initiator. Remainder → jackpot."""
+        if amount <= 0:
+            return 0, []
+
+        all_map = await self.r.hgetall(K_STATS_WINNINGS)
+        if not all_map:
+            return 0, []
+
+        recipients = [int(u) for u in all_map.keys() if int(u) != initiator_id]
+        if not recipients:
+            return 0, []
+
+        per = amount // len(recipients)
+        remainder = amount - per * len(recipients)
+        if per <= 0:
+            # Not enough to split meaningfully → remainder to jackpot
+            await self.r.incrby(K_JACKPOT_POOL, amount)
+            return 0, recipients
+
+        # Batch credit recipients
+        pipe = self.r.pipeline()
+        for rid in recipients:
+            s = str(rid)
+            pipe.hincrby(K_STATS_WINNINGS, s, per)
+            pipe.zincrby(K_LEADERBOARD, per, s)
+        await pipe.execute()
+
+        if remainder > 0:
+            await self.r.incrby(K_JACKPOT_POOL, remainder)
+
+        return per * len(recipients), recipients
 
     # ---------------- Spin handling (button interaction) ----------------
 

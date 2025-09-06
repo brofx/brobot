@@ -547,6 +547,7 @@ class SlotsCog(commands.Cog):
         spin_time = datetime.now(tz=NY_TZ)
         spin_time_utc_sec = int(spin_time.timestamp())
         date_str = ny_date_str()
+        jackpot_contribution = 0
 
         # NORMAL spin: enforce cooldown
         if not mega:
@@ -569,7 +570,8 @@ class SlotsCog(commands.Cog):
                 jackpot_award = 0
 
             if jackpot_award > 0:
-                await self.r.set(K_JACKPOT_POOL, int(jackpot_award * (1 + JACKPOT_NORMAL_INC_FRACTION)))
+                jackpot_contribution = int(jackpot_award * JACKPOT_NORMAL_INC_FRACTION)
+                await self.r.set(K_JACKPOT_POOL, int(jackpot_award + jackpot_contribution))
         else:
             # MEGA spin: enforce per-day count and cost
             mkey = mega_plays_key(user.id, date_str)
@@ -697,6 +699,7 @@ class SlotsCog(commands.Cog):
         title = "🎰 Your Spin Result" if not mega else "🤖 MEGA Spin Result"
 
         if not mega:
+            # Decide outcome text
             if net_delta > 0:
                 desc_lines.append(f"**You won:** {net_delta:,}")
             else:
@@ -735,6 +738,8 @@ class SlotsCog(commands.Cog):
         )
         if jackpot_award > 0:
             desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:,}")
+        elif jackpot_contribution:
+            desc_lines.append(f"> {fmt_spin_value(jackpot_contribution)} added to jackpot")
         
         embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
         embed.timestamp = spin_time

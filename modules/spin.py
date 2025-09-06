@@ -62,7 +62,7 @@ COOLDOWN_SECONDS = 300  # 5 minutes
 NORMAL_TOKENS_CAP = 6   # up to 5 stored normal spins
 BIGGEST_SPINS_LEN = 5
 DUEL_TIMEOUT_SECONDS = 60 * 60 # 1 Hour
-DUEL_FEE_FRACTION = 0.10  # 5%
+DUEL_FEE_FRACTION = 0.10  # 10%
 DUEL_LEADERBOARD_LEN = 5
 
 # Redis keys
@@ -811,7 +811,7 @@ class SlotsCog(commands.Cog):
 
         desc = (
             f"🗡️ <@{uid}> has issued a **1v1 challenge**!\n"
-            f"Join cost: **{init_fee:,}** (same as challenger’s 5%).\n"
+            f"Join cost: **{init_fee:,}** (same as challenger's {int(DUEL_FEE_FRACTION * 100)}%).\n"
             f"Expires **<t:{expires_at}:R>**.\n"
             f"Staked by challenger: **{init_fee:,}**"
         )

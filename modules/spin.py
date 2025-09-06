@@ -716,14 +716,15 @@ class SlotsCog(commands.Cog):
                 pipe.hincrbyfloat(K_STATS_WINNINGS, uid, escrow)
                 pipe.zincrby(K_LEADERBOARD, escrow, uid)
                 await pipe.execute()
-                escrow = 0  # fully returned to user (and more)
                 
+
                 # refill one MEGA use (reduce today's used if > 0)
                 mkey = mega_plays_key(int(uid), ny_date_str())
                 used = int(await self.r.get(mkey) or 0)
                 if used > 0:
                     await self.r.decr(mkey)
                 summary_lines.append(f"Outcome: **Refund + refill MEGA** (+{escrow:,}, MEGA usage refunded if any).")
+                escrow = 0  # fully returned to user (and more)
 
             elif choice_id in ("refund_plus_half", "refund_double"):
                 bonus_fraction = chosen.params.get("bonus_fraction", 0.5)
@@ -732,8 +733,8 @@ class SlotsCog(commands.Cog):
                 pipe.hincrbyfloat(K_STATS_WINNINGS, uid, escrow + bonus)
                 pipe.zincrby(K_LEADERBOARD, escrow + bonus, uid)
                 await pipe.execute()
-                escrow = 0  # fully returned to user (and more)
                 summary_lines.append(f"Outcome: **Refund + {int(bonus_fraction * 100)}%** (+{escrow + bonus:,}).")
+                escrow = 0  # fully returned to user (and more)
 
             elif choice_id == "spread_cost_others":
                 distributed, recipients = await self._sigma_spread_to_all_others(escrow, initiator_id=int(uid))

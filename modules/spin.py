@@ -777,7 +777,7 @@ class SlotsCog(commands.Cog):
 
             # Any remaining escrow not refunded or shared → jackpot
             if escrow > 0:
-                await self.r.incrby(K_JACKPOT_POOL, escrow)
+                await self.r.incrbyfloat(K_JACKPOT_POOL, escrow)
                 summary_lines.append(f"*{escrow:,} added to jackpot.*")
 
             # Compose ephemeral result
@@ -869,7 +869,7 @@ class SlotsCog(commands.Cog):
         remainder = amount - per * len(recipients)
         if per <= 0:
             # Not enough to split meaningfully → remainder to jackpot
-            await self.r.incrby(K_JACKPOT_POOL, amount)
+            await self.r.incrbyfloat(K_JACKPOT_POOL, amount)
             return 0, recipients
 
         # Batch credit recipients
@@ -881,7 +881,7 @@ class SlotsCog(commands.Cog):
         await pipe.execute()
 
         if remainder > 0:
-            await self.r.incrby(K_JACKPOT_POOL, remainder)
+            await self.r.incrbyfloat(K_JACKPOT_POOL, remainder)
 
         return per * len(recipients), recipients
 
@@ -944,7 +944,7 @@ class SlotsCog(commands.Cog):
             pipe = self.r.pipeline()
             pipe.hincrby(K_STATS_WINNINGS, user_id, -cost)
             pipe.zincrby(K_LEADERBOARD, -cost, user_id)
-            pipe.incrby(K_JACKPOT_POOL, cost)
+            pipe.incrbyfloat(K_JACKPOT_POOL, cost)
             await pipe.execute()
 
             # Record today's MEGA usage
@@ -1279,7 +1279,7 @@ class SlotsCog(commands.Cog):
 
         # 10% to jackpot
         if house_cut > 0:
-            await self.r.incrby(K_JACKPOT_POOL, house_cut)
+            await self.r.incrbyfloat(K_JACKPOT_POOL, house_cut)
 
         # Credit payouts + W/L
         if split:

@@ -1181,8 +1181,8 @@ class SlotsCog(commands.Cog):
         desc = (
             f"🗡️ <@{uid}> has issued a **1v1 challenge**!\n"
             f"Join cost: **{init_fee:,}** ({fmt_spin_value(init_fee)}).\n"
-            f"Minimum payout: **{init_fee*2:,}** ({fmt_spin_value(init_fee*2)})"
-            f"Expires **<t:{expires_at}:R>**.\n"
+            f"Minimum payout: **{init_fee*2:,}** ({fmt_spin_value(init_fee*2)})\n"
+            f"Expires **<t:{expires_at}:R>**."
         )
         embed = discord.Embed(title="1v1 Challenge", description=desc, color=discord.Color.blurple())
 

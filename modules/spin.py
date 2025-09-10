@@ -116,6 +116,14 @@ def next_midnight_et_epoch() -> int:
 def fmt_spin_value(spin_value: int):
     return f"{spin_value:.3e}" if spin_value > 1_000_000_000_000 else f"{spin_value:,}"
 
+# Test version
+# def fmt_spin_value(spin_value: int, orig=False):
+#     prefix = ""
+#     if orig:
+#         prefix = f"{spin_value:,}"
+
+#     return prefix + (f"{spin_value:.3e}" if (spin_value > 1_000_000_000_000 or orig) else ("" if prefix else f"{spin_value:,}"))
+
 @dataclass
 class Item:
     key: str
@@ -711,37 +719,44 @@ class SlotsCog(commands.Cog):
             share_thread_note: Optional[str] = None
 
             if choice_id == "refund_refill_mega":
+                mega_refund = chosen.params.get("bonus_fraction", 0.5)
                 # refund escrow
                 pipe = self.r.pipeline()
                 pipe.hincrbyfloat(K_STATS_WINNINGS, uid, escrow)
                 pipe.zincrby(K_LEADERBOARD, escrow, uid)
                 await pipe.execute()
-                
+                escrow = 0
 
-                # refill one MEGA use (reduce today's used if > 0)
-                mkey = mega_plays_key(int(uid), ny_date_str())
-                used = int(await self.r.get(mkey) or 0)
-                if used > 0:
-                    await self.r.decr(mkey)
-                summary_lines.append(f"Outcome: **Refund + refill MEGA** (+{escrow:,}, MEGA usage refunded if any).")
-                escrow = 0  # fully returned to user (and more)
+                mega_refund = int(chosen.params.get("mega_refund", 1))
+                actually_refunded = await self._refund_mega_usage(int(uid), mega_refund)
 
-            elif choice_id in ("refund_plus_half", "refund_double"):
+                if actually_refunded > 0:
+                    summary_lines.append(
+                        f"Outcome: **Refund cost + refund {actually_refunded} MEGA use(s)** (+{cost:,} returned)."
+                    )
+                else:
+                    summary_lines.append(
+                        f"Outcome: **Refund** {cost:,} ({fmt_spin_value(cost)}); you hadn't used any MEGA spins to refund."
+                    )                
+            elif choice_id == "nothing":
+                summary_lines.append(f"Outcome: **{escrow:,}** ({fmt_spin_value(escrow)}) added to the progressive jackpot.")
+                pass
+            elif choice_id in ("refund_plus_half", "refund_double", "refund_triple", "refund_quad", "refund_quin"):
                 bonus_fraction = chosen.params.get("bonus_fraction", 0.5)
                 bonus = int(escrow * bonus_fraction)
                 pipe = self.r.pipeline()
                 pipe.hincrbyfloat(K_STATS_WINNINGS, uid, escrow + bonus)
                 pipe.zincrby(K_LEADERBOARD, escrow + bonus, uid)
                 await pipe.execute()
-                summary_lines.append(f"Outcome: **Refund + {int(bonus_fraction * 100)}%** (+{escrow + bonus:,}).")
+                summary_lines.append(f"Outcome: **Refund + {int(bonus_fraction * 100)}%** +{escrow + bonus:,} ({fmt_spin_value(escrow + bonus)}).")
                 escrow = 0  # fully returned to user (and more)
 
             elif choice_id == "spread_cost_others":
                 distributed, recipients = await self._sigma_spread_to_all_others(escrow, initiator_id=int(uid))
                 escrow = 0  # fully used for spread (remainder handled inside helper)
                 if recipients:
-                    summary_lines.append(f"Outcome: **Spread cost** — {distributed:,} points shared to **{len(recipients)}** others.")
-                    share_thread_note = f"Σ Sigma: <@{uid}> spread **{distributed:,}** points to **{len(recipients)}** players."
+                    summary_lines.append(f"Outcome: **Spread cost** — {distributed:,} ({fmt_spin_value(distributed)}) points shared to **{len(recipients)}** others.")
+                    share_thread_note = f"Σ Sigma: <@{uid}> spread **{distributed:,}** ({fmt_spin_value(distributed)}) points to **{len(recipients)}** players."
                 else:
                     # no one else to share with → refund
                     pipe = self.r.pipeline()
@@ -772,10 +787,10 @@ class SlotsCog(commands.Cog):
 
                     distributed, recipients = await self._sigma_spread_to_all_others(bal_total, initiator_id=int(uid))
                     summary_lines.append(
-                        f"Outcome: **Share entire balance** — distributed {distributed:,} to {len(recipients)} others. "
+                        f"Outcome: **Share entire balance** — distributed {distributed:,} ({fmt_spin_value(distributed)}) to {len(recipients)} others. "
                         f"(Your cost was refunded.)"
                     )
-                    share_thread_note = f"Σ Sigma: <@{uid}> shared their entire balance (**{distributed:,}**) to others."
+                    share_thread_note = f"Σ Sigma: <@{uid}> shared their entire balance of **{distributed:,}** ({fmt_spin_value(distributed)}) to others."
                 else:
                     summary_lines.append("Outcome: **Share entire balance** — nothing to share (balance was 0). Cost was refunded.")
 
@@ -1061,9 +1076,9 @@ class SlotsCog(commands.Cog):
         else:
             # MEGA info block
             # Present gross, cost, net
-            gross_line = f"Gross win (incl. MEGA x{MEGA_PAYOUT_MULT:.1f}): **{gross_total:,}**"
-            cost_line = f"MEGA cost (10%): **-{cost:,}**"
-            net_line = f"**Net change:** **{net_delta:,}**"
+            gross_line = f"Gross win (incl. MEGA x{MEGA_PAYOUT_MULT:.1f}): **{gross_total:,}** ({fmt_spin_value(gross_total)})"
+            cost_line = f"MEGA cost (10%): **-{cost:,}** ({fmt_spin_value(cost)})"
+            net_line = f"**Net change:** **{net_delta:,}** ({fmt_spin_value(net_delta)})"
             desc_lines.extend([gross_line, cost_line, net_line])
 
         if breakdown:
@@ -1091,7 +1106,7 @@ class SlotsCog(commands.Cog):
             color=discord.Color.orange() if mega else (discord.Color.green() if net_delta > 0 else discord.Color.dark_gray())
         )
         if jackpot_award > 0:
-            desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:,}")
+            desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:,} ({fmt_spin_value(jackpot_award)})")
         elif jackpot_contribution:
             desc_lines.append(f"*{fmt_spin_value(jackpot_contribution)} added to jackpot*")
         
@@ -1165,9 +1180,10 @@ class SlotsCog(commands.Cog):
 
         desc = (
             f"🗡️ <@{uid}> has issued a **1v1 challenge**!\n"
-            f"Join cost: **{init_fee:,}** (same as challenger's {int(DUEL_FEE_FRACTION * 100)}%).\n"
+            f"Join cost: **{init_fee:,}** ({fmt_spin_value(init_fee)}).\n"
+            f"Staked by challenger: **{init_fee:,}**",
+            f"Minimum payout: **{init_fee*2:,}** ({fmt_spin_value(init_fee*2)})"
             f"Expires **<t:{expires_at}:R>**.\n"
-            f"Staked by challenger: **{init_fee:,}**"
         )
         embed = discord.Embed(title="1v1 Challenge", description=desc, color=discord.Color.blurple())
 
@@ -1229,7 +1245,7 @@ class SlotsCog(commands.Cog):
         opp_points = int(await self.r.hget(K_STATS_WINNINGS, opp_uid) or 0)
         if opp_points < init_fee:
             return await interaction.response.send_message(
-                f"You need at least **{init_fee:,}** points to accept this 1v1.", ephemeral=True
+                f"You need at least **{init_fee:,}** ({fmt_spin_value(init_fee)}) points to accept this 1v1.", ephemeral=True
             )
 
         # Deduct opponent fee now
@@ -1326,17 +1342,17 @@ class SlotsCog(commands.Cog):
         )
 
         stakes = (
-            f"Challenger fee: **{init_fee:,}**\n"
-            f"Opponent fee: **{init_fee:,}**\n"
-            f"Pot: **{pot_total:,}**\n"
-            f"House → Jackpot (10%): **{house_cut:,}**"
+            f"Challenger fee: **{init_fee:,}** ({fmt_spin_value(init_fee)})\n"
+            f"Opponent fee: **{init_fee:,}** ({fmt_spin_value(init_fee)})\n"
+            f"Pot: **{pot_total:,}** ({fmt_spin_value(pot_total)})\n"
+            f"House → Jackpot (10%): **{house_cut:,}** ({fmt_spin_value(house_cut)})"
         )
 
         if split:
-            outcome = f"Result: **Tie** — each receives **{(winner_payout // 2):,}**"
+            outcome = f"Result: **Tie** — each receives **{(winner_payout // 2):,}** ({fmt_spin_value(winner_payout // 2)})"
             color = discord.Color.purple()
         else:
-            outcome = f"Winner: <@{winner_id}> receives **{winner_payout:,}**"
+            outcome = f"Winner: <@{winner_id}> receives **{winner_payout:,}** ({fmt_spin_value(winner_payout)})"
             color = discord.Color.purple()
 
         embed = discord.Embed(title="⚔️ 1v1 Result", description=desc, color=color)
@@ -1633,7 +1649,41 @@ class SlotsCog(commands.Cog):
 
         return grid, total_after, breakdown, mult_used, grid_mult, total_mult
     
-
+    async def _refund_mega_usage(self, user_id: int, count: int) -> int:
+        """
+        Reduce today's MEGA usage by up to `count`, not below 0.
+        Returns how many were actually refunded.
+        """
+        if count <= 0:
+            return 0
+        mkey = mega_plays_key(user_id, ny_date_str())
+        # optimistic retry to avoid going negative under race
+        for _ in range(3):
+            try:
+                async with self.r.pipeline() as p:
+                    await p.watch(mkey)
+                    used = int(await self.r.get(mkey) or 0)
+                    if used <= 0:
+                        await p.reset()
+                        return 0
+                    refund = min(used, count)
+                    new_val = used - refund
+                    p.multi()
+                    if new_val > 0:
+                        p.set(mkey, new_val, ex=60 * 60 * 48)
+                    else:
+                        p.delete(mkey)
+                    await p.execute()
+                    return refund
+            except redis.WatchError:
+                continue
+        # fallback (non-atomic): best-effort clamp
+        used = int(await self.r.get(mkey) or 0)
+        if used <= 0:
+            return 0
+        refund = min(used, count)
+        await self.r.set(mkey, max(0, used - refund), ex=60 * 60 * 48)
+        return refund
 
     # ---------------- Persistent channel message ----------------
 

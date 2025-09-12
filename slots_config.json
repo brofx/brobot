@@ -29,12 +29,12 @@
     { "key": "cassie",  "emoji_id": 385929891004153856, "emoji_name": "aww_cassie", "emoji_animated": false, "weight": 5,  "base_value": 500 },
 
     { "key": "m2",    "emoji_id": 1407887874829058169, "emoji_name": "multi2", "emoji_animated": false,  "weight": 15,    "base_value": 5, "is_multiplier": true, "multiplier": 2.712 },
-    { "key": "m5",    "emoji_id": 1407888377189105995, "emoji_name": "multi5", "emoji_animated": false,   "weight": 10,  "base_value": 10, "is_multiplier": true, "multiplier": 5.625 },
-    { "key": "m10",   "emoji_id": 1407888665044189224, "emoji_name": "multi10", "emoji_animated": false,  "weight": 7,  "base_value": 25, "is_multiplier": true, "multiplier": 17.341 },
-    { "key": "m25",   "emoji_id": 1407887742356029511, "emoji_name": "multi25", "emoji_animated": false,  "weight": 5,  "base_value": 50, "is_multiplier": true, "multiplier": 25.976 },
-    { "key": "m50",   "emoji_id": 1407889801985785876, "emoji_name": "multi50", "emoji_animated": false,  "weight": 3,  "base_value": 100, "is_multiplier": true, "multiplier": 69.6969 },
-    { "key": "m100",  "emoji_id": 1407889564785184829, "emoji_name": "multi100", "emoji_animated": false, "weight": 2, "base_value": 500, "is_multiplier": true, "multiplier": 123.456 },
-    { "key": "m1000", "emoji_id": 1407889561723343011, "emoji_name": "multi1000", "emoji_animated": false,"weight": 1, "base_value": 1000, "is_multiplier": true, "multiplier": 1234.567 }
+    { "key": "m5",    "emoji_id": 1407888377189105995, "emoji_name": "multi5", "emoji_animated": false,   "weight": 12,  "base_value": 10, "is_multiplier": true, "multiplier": 5.625 },
+    { "key": "m10",   "emoji_id": 1407888665044189224, "emoji_name": "multi10", "emoji_animated": false,  "weight": 10,  "base_value": 25, "is_multiplier": true, "multiplier": 17.341 },
+    { "key": "m25",   "emoji_id": 1407887742356029511, "emoji_name": "multi25", "emoji_animated": false,  "weight": 7,  "base_value": 50, "is_multiplier": true, "multiplier": 25.976 },
+    { "key": "m50",   "emoji_id": 1407889801985785876, "emoji_name": "multi50", "emoji_animated": false,  "weight": 5,  "base_value": 100, "is_multiplier": true, "multiplier": 69.6969 },
+    { "key": "m100",  "emoji_id": 1407889564785184829, "emoji_name": "multi100", "emoji_animated": false, "weight": 4, "base_value": 500, "is_multiplier": true, "multiplier": 123.456 },
+    { "key": "m1000", "emoji_id": 1407889561723343011, "emoji_name": "multi1000", "emoji_animated": false,"weight": 2, "base_value": 1000, "is_multiplier": true, "multiplier": 1234.567 }
   ],
   "sigma": {
     "enabled": true,

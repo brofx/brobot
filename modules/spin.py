@@ -948,7 +948,7 @@ class SlotsCog(commands.Cog):
             used = int(await self.r.get(mkey) or 0)
             if used >= MEGA_SPINS_PER_DAY:
                 return await interaction.response.send_message(
-                    f"You've used your **{MEGA_SPINS_PER_DAY}** MEGA spins for today. Come back after midnight ET!",
+                    f"You've used your **{MEGA_SPINS_PER_DAY}** MEGA spins for today. Come back after midnight ET or try a **Sigma** spin to refill some MEGA spins!",
                     ephemeral=True
                 )
 

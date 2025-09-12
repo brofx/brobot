@@ -739,7 +739,6 @@ class SlotsCog(commands.Cog):
                         f"Outcome: **Refund** {cost:,} ({fmt_spin_value(cost, force=True)}); you hadn't used any MEGA spins to refund."
                     )                
             elif choice_id == "nothing":
-                summary_lines.append(f"Outcome: **{escrow:,}** ({fmt_spin_value(escrow, force=True)}) added to the progressive jackpot.")
                 pass
             elif choice_id in ("refund_plus_half", "refund_double", "refund_triple", "refund_quad", "refund_quin"):
                 bonus_fraction = chosen.params.get("bonus_fraction", 0.5)
@@ -798,7 +797,7 @@ class SlotsCog(commands.Cog):
             # Any remaining escrow not refunded or shared → jackpot
             if escrow > 0:
                 await self.r.incrbyfloat(K_JACKPOT_POOL, escrow)
-                summary_lines.append(f"*{escrow:,} added to jackpot.*")
+                summary_lines.append(f"***{escrow:,}** ({fmt_spin_value(escrow, force=True)}) added to jackpot.*")
 
             # Compose ephemeral result
             tokens_after, next_in = await self._refill_sigma_tokens(user.id)

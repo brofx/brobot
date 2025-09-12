@@ -113,8 +113,8 @@ def next_midnight_et_epoch() -> int:
     next_midnight = datetime.combine(next_day, dtime(0, 0, 0), tzinfo=NY_TZ)
     return int(next_midnight.timestamp())
 
-def fmt_spin_value(spin_value: int):
-    return f"{spin_value:.3e}" if spin_value > 1_000_000_000_000 else f"{spin_value:,}"
+def fmt_spin_value(spin_value: int, force: bool = False):
+    return f"{spin_value:.3e}" if (spin_value > 1_000_000_000_000 or force) else f"{spin_value:,}"
 
 # Test version
 # def fmt_spin_value(spin_value: int, orig=False):
@@ -736,10 +736,10 @@ class SlotsCog(commands.Cog):
                     )
                 else:
                     summary_lines.append(
-                        f"Outcome: **Refund** {cost:,} ({fmt_spin_value(cost)}); you hadn't used any MEGA spins to refund."
+                        f"Outcome: **Refund** {cost:,} ({fmt_spin_value(cost, force=True)}); you hadn't used any MEGA spins to refund."
                     )                
             elif choice_id == "nothing":
-                summary_lines.append(f"Outcome: **{escrow:,}** ({fmt_spin_value(escrow)}) added to the progressive jackpot.")
+                summary_lines.append(f"Outcome: **{escrow:,}** ({fmt_spin_value(escrow, force=True)}) added to the progressive jackpot.")
                 pass
             elif choice_id in ("refund_plus_half", "refund_double", "refund_triple", "refund_quad", "refund_quin"):
                 bonus_fraction = chosen.params.get("bonus_fraction", 0.5)
@@ -748,15 +748,15 @@ class SlotsCog(commands.Cog):
                 pipe.hincrbyfloat(K_STATS_WINNINGS, uid, escrow + bonus)
                 pipe.zincrby(K_LEADERBOARD, escrow + bonus, uid)
                 await pipe.execute()
-                summary_lines.append(f"Outcome: **Refund + {int(bonus_fraction * 100)}%** +{escrow + bonus:,} ({fmt_spin_value(escrow + bonus)}).")
+                summary_lines.append(f"Outcome: **Refund + {int(bonus_fraction * 100)}%** +{escrow + bonus:,} ({fmt_spin_value(escrow + bonus, force=True)}).")
                 escrow = 0  # fully returned to user (and more)
 
             elif choice_id == "spread_cost_others":
                 distributed, recipients = await self._sigma_spread_to_all_others(escrow, initiator_id=int(uid))
                 escrow = 0  # fully used for spread (remainder handled inside helper)
                 if recipients:
-                    summary_lines.append(f"Outcome: **Spread cost** — {distributed:,} ({fmt_spin_value(distributed)}) points shared to **{len(recipients)}** others.")
-                    share_thread_note = f"Σ Sigma: <@{uid}> spread **{distributed:,}** ({fmt_spin_value(distributed)}) points to **{len(recipients)}** players."
+                    summary_lines.append(f"Outcome: **Spread cost** — {distributed:,} ({fmt_spin_value(distributed, force=True)}) points shared to **{len(recipients)}** others.")
+                    share_thread_note = f"Σ Sigma: <@{uid}> spread **{distributed:,}** ({fmt_spin_value(distributed, force=True)}) points to **{len(recipients)}** players."
                 else:
                     # no one else to share with → refund
                     pipe = self.r.pipeline()
@@ -787,10 +787,10 @@ class SlotsCog(commands.Cog):
 
                     distributed, recipients = await self._sigma_spread_to_all_others(bal_total, initiator_id=int(uid))
                     summary_lines.append(
-                        f"Outcome: **Share entire balance** — distributed {distributed:,} ({fmt_spin_value(distributed)}) to {len(recipients)} others. "
+                        f"Outcome: **Share entire balance** — distributed {distributed:,} ({fmt_spin_value(distributed, force=True)}) to {len(recipients)} others. "
                         f"(Your cost was refunded.)"
                     )
-                    share_thread_note = f"Σ Sigma: <@{uid}> shared their entire balance of **{distributed:,}** ({fmt_spin_value(distributed)}) to others."
+                    share_thread_note = f"Σ Sigma: <@{uid}> shared their entire balance of **{distributed:,}** ({fmt_spin_value(distributed, force=True)}) to others."
                 else:
                     summary_lines.append("Outcome: **Share entire balance** — nothing to share (balance was 0). Cost was refunded.")
 
@@ -1076,9 +1076,9 @@ class SlotsCog(commands.Cog):
         else:
             # MEGA info block
             # Present gross, cost, net
-            gross_line = f"Gross win (incl. MEGA x{MEGA_PAYOUT_MULT:.1f}): **{gross_total:,}** ({fmt_spin_value(gross_total)})"
-            cost_line = f"MEGA cost (10%): **-{cost:,}** ({fmt_spin_value(cost)})"
-            net_line = f"**Net change:** **{net_delta:,}** ({fmt_spin_value(net_delta)})"
+            gross_line = f"Gross win (incl. MEGA x{MEGA_PAYOUT_MULT:.1f}): **{gross_total:,}** ({fmt_spin_value(gross_total, force=True)})"
+            cost_line = f"MEGA cost (10%): **-{cost:,}** ({fmt_spin_value(cost, force=True)})"
+            net_line = f"**Net change:** **{net_delta:,}** ({fmt_spin_value(net_delta, force=True)})"
             desc_lines.extend([gross_line, cost_line, net_line])
 
         if breakdown:
@@ -1106,9 +1106,9 @@ class SlotsCog(commands.Cog):
             color=discord.Color.orange() if mega else (discord.Color.green() if net_delta > 0 else discord.Color.dark_gray())
         )
         if jackpot_award > 0:
-            desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:,} ({fmt_spin_value(jackpot_award)})")
+            desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:,} ({fmt_spin_value(jackpot_award, force=True)})")
         elif jackpot_contribution:
-            desc_lines.append(f"*{fmt_spin_value(jackpot_contribution)} added to jackpot*")
+            desc_lines.append(f"*{jackpot_contribution:,} ({fmt_spin_value(jackpot_contribution, force=True)}) added to jackpot*")
         
         embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
         embed.timestamp = spin_time
@@ -1180,8 +1180,8 @@ class SlotsCog(commands.Cog):
 
         desc = (
             f"🗡️ <@{uid}> has issued a **1v1 challenge**!\n"
-            f"Join cost: **{init_fee:,}** ({fmt_spin_value(init_fee)}).\n"
-            f"Minimum payout: **{init_fee*2:,}** ({fmt_spin_value(init_fee*2)})\n"
+            f"Join cost: **{init_fee:,}** ({fmt_spin_value(init_fee, force=True)}).\n"
+            f"Minimum payout: **{init_fee*2:,}** ({fmt_spin_value(init_fee*2, force=True)})\n"
             f"Expires **<t:{expires_at}:R>**."
         )
         embed = discord.Embed(title="1v1 Challenge", description=desc, color=discord.Color.blurple())
@@ -1244,7 +1244,7 @@ class SlotsCog(commands.Cog):
         opp_points = int(await self.r.hget(K_STATS_WINNINGS, opp_uid) or 0)
         if opp_points < init_fee:
             return await interaction.response.send_message(
-                f"You need at least **{init_fee:,}** ({fmt_spin_value(init_fee)}) points to accept this 1v1.", ephemeral=True
+                f"You need at least **{init_fee:,}** ({fmt_spin_value(init_fee, force=True)}) points to accept this 1v1.", ephemeral=True
             )
 
         # Deduct opponent fee now
@@ -1341,17 +1341,17 @@ class SlotsCog(commands.Cog):
         )
 
         stakes = (
-            f"Challenger fee: **{init_fee:,}** ({fmt_spin_value(init_fee)})\n"
-            f"Opponent fee: **{init_fee:,}** ({fmt_spin_value(init_fee)})\n"
-            f"Pot: **{pot_total:,}** ({fmt_spin_value(pot_total)})\n"
-            f"House → Jackpot (10%): **{house_cut:,}** ({fmt_spin_value(house_cut)})"
+            f"Challenger fee: **{init_fee:,}** ({fmt_spin_value(init_fee, force=True)})\n"
+            f"Opponent fee: **{init_fee:,}** ({fmt_spin_value(init_fee, force=True)})\n"
+            f"Pot: **{pot_total:,}** ({fmt_spin_value(pot_total, force=True)})\n"
+            f"House → Jackpot (10%): **{house_cut:,}** ({fmt_spin_value(house_cut, force=True)})"
         )
 
         if split:
-            outcome = f"Result: **Tie** — each receives **{(winner_payout // 2):,}** ({fmt_spin_value(winner_payout // 2)})"
+            outcome = f"Result: **Tie** — each receives **{(winner_payout // 2):,}** ({fmt_spin_value(winner_payout // 2, force=True)})"
             color = discord.Color.purple()
         else:
-            outcome = f"Winner: <@{winner_id}> receives **{winner_payout:,}** ({fmt_spin_value(winner_payout)})"
+            outcome = f"Winner: <@{winner_id}> receives **{winner_payout:,}** ({fmt_spin_value(winner_payout, force=True)})"
             color = discord.Color.purple()
 
         embed = discord.Embed(title="⚔️ 1v1 Result", description=desc, color=color)

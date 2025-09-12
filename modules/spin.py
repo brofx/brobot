@@ -1078,7 +1078,7 @@ class SlotsCog(commands.Cog):
             # MEGA info block
             # Present gross, cost, net
             gross_line = f"Gross win (incl. MEGA x{MEGA_PAYOUT_MULT:.1f}): **{gross_total:,}** ({fmt_spin_value(gross_total, force=True)})"
-            cost_line = f"MEGA cost (10%): **-{cost:,}** ({fmt_spin_value(cost, force=True)})"
+            cost_line = f"MEGA cost (10%): **-{cost:,}** (-{fmt_spin_value(cost, force=True)})"
             net_line = f"**Net change:** **{net_delta:,}** ({fmt_spin_value(net_delta, force=True)})"
             desc_lines.extend([gross_line, cost_line, net_line])
 
@@ -1337,8 +1337,8 @@ class SlotsCog(commands.Cog):
         def grid_str(g): return "\n".join(" ".join(cell.token() for cell in row) for row in g)
 
         desc = (
-            f"**Challenger <@{initiator_id}>**\n{grid_str(g1)}\n**Total:** {t1:,}\n\n"
-            f"**Opponent <@{opp_uid}>**\n{grid_str(g2)}\n**Total:** {t2:,}"
+            f"**Challenger <@{initiator_id}>**\n{grid_str(g1)}\n**Total:** {t1:,} ({fmt_spin_value(t1, force=True)})\n\n"
+            f"**Opponent <@{opp_uid}>**\n{grid_str(g2)}\n**Total:** {t2:,} ({fmt_spin_value(t2, force=True)})"
         )
 
         stakes = (

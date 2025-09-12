@@ -755,8 +755,9 @@ class SlotsCog(commands.Cog):
                 distributed, recipients = await self._sigma_spread_to_all_others(escrow, initiator_id=int(uid))
                 escrow = 0  # fully used for spread (remainder handled inside helper)
                 if recipients:
+                    per = distributed // len(recipients)
                     summary_lines.append(f"Outcome: **Spread cost** — {distributed:,} ({fmt_spin_value(distributed, force=True)}) points shared to **{len(recipients)}** others.")
-                    share_thread_note = f"Σ Sigma: <@{uid}> spread **{distributed:,}** ({fmt_spin_value(distributed, force=True)}) points to **{len(recipients)}** players."
+                    share_thread_note = f"Σ Sigma: <@{uid}> spread **{distributed:,}** ({fmt_spin_value(distributed, force=True)}) points to **{len(recipients)}** players. Each player receives **{per}** ({fmt_spin_value(per, force=True)})."
                 else:
                     # no one else to share with → refund
                     pipe = self.r.pipeline()

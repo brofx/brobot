@@ -5,7 +5,7 @@
   "items": [
     { "key": "wild", "emoji_id": 1408107455237586964, "emoji_name": "brfx_shiny", "emoji_animated": false, "weight": 10, "base_value": 1250, "is_wild": true },
 
-    { "key": "lemon",  "emoji_id": 763061696439910450, "emoji_name": "wtfJOE", "emoji_animated": false, "weight": 30, "base_value": 13 },
+    { "key": "lemon",  "emoji_id": 763061696439910450, "emoji_name": "wtfJOE", "emoji_animated": false, "weight": 17, "base_value": 13 },
 
     { "key": "scott",  "emoji_id": 385598623997755392, "emoji_name": "scott", "emoji_animated": false, "weight": 11,  "base_value": 123 },
     { "key": "pelly",  "emoji_id": 385599722792157184, "emoji_name": "pelly", "emoji_animated": false, "weight": 11,  "base_value": 123 },

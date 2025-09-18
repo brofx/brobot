@@ -64,6 +64,7 @@ BIGGEST_SPINS_LEN = 5
 DUEL_TIMEOUT_SECONDS = 60 * 60 # 1 Hour
 DUEL_FEE_FRACTION = 0.10  # 10%
 DUEL_LEADERBOARD_LEN = 5
+REFRESH_THROTTLE_SECONDS = 30
 
 # Redis keys
 K_MESSAGE_ID = "slots:message_id"
@@ -87,6 +88,8 @@ K_DUEL_LOSSES = "slots:duel:losses"             # hash user_id -> losses
 K_SIGMA_TOKENS = "slots:sigma:tokens:{user_id}"
 K_SIGMA_LAST   = "slots:sigma:last:{user_id}"
 K_SIGMA_LOCK   = "slots:sigma:lock:{user_id}"   # short TTL lock to prevent double submits
+K_MAINMSG_LAST_REFRESH = "slots:mainmsg:last_refresh"
+K_MAINMSG_REFRESH_LOCK = "slots:mainmsg:refresh_lock"
 
 # Optional: track mega spins separately
 K_STATS_SPINS_MEGA = "slots:stats:spins_mega"      # hash user_id -> total mega spins
@@ -819,6 +822,12 @@ class SlotsCog(commands.Cog):
                     except Exception:
                         pass
 
+            # Refresh persistent message (best-effort)
+            try:
+                await self._maybe_refresh_channel_message()
+            except Exception:
+                pass
+
             if interaction.response.is_done():
                 await interaction.followup.send(embed=embed, ephemeral=True)
             else:
@@ -1053,7 +1062,7 @@ class SlotsCog(commands.Cog):
 
         # Refresh persistent message (best-effort)
         try:
-            await self._refresh_channel_message()
+            await self._maybe_refresh_channel_message()
         except Exception:
             pass
 
@@ -1385,6 +1394,12 @@ class SlotsCog(commands.Cog):
                 await interaction.followup.send("1v1 resolved — results posted.", ephemeral=True)
             except Exception:
                 pass
+
+        # Refresh persistent message (best-effort)
+        try:
+            await self._maybe_refresh_channel_message()
+        except Exception:
+            pass
 
         # Delete original challenge message to avoid channel clutter
         try:
@@ -1818,6 +1833,42 @@ class SlotsCog(commands.Cog):
 
         embed.add_field(name="1v1 Leaderboard", value="\n".join(duel_lines), inline=False)
         return embed
+    
+    async def _maybe_refresh_channel_message(self, *, force: bool = False):
+        """
+        Refresh the persistent message at most once every REFRESH_THROTTLE_SECONDS.
+        Use force=True to bypass the throttle (e.g., setup/reload).
+        """
+        now = int(time.time())
+        if force:
+            try:
+                await self._refresh_channel_message()
+            finally:
+                await self.r.set(K_MAINMSG_LAST_REFRESH, now)
+            return
+
+        last_s = await self.r.get(K_MAINMSG_LAST_REFRESH)
+        if last_s is not None:
+            try:
+                last = int(last_s)
+                if now - last < REFRESH_THROTTLE_SECONDS:
+                    return  # too soon; skip
+            except Exception:
+                pass
+
+        # Prevent stampede: only one refresher at a time
+        if not await self.r.set(K_MAINMSG_REFRESH_LOCK, "1", ex=10, nx=True):
+            return
+
+        try:
+            await self._refresh_channel_message()
+            await self.r.set(K_MAINMSG_LAST_REFRESH, now)
+        finally:
+            try:
+                await self.r.delete(K_MAINMSG_REFRESH_LOCK)
+            except Exception:
+                pass
+
 
     async def _refresh_channel_message(self):
         msg_id = await self.r.get(K_MESSAGE_ID)

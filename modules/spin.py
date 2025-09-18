@@ -1023,15 +1023,15 @@ class SlotsCog(commands.Cog):
         await self.r.hincrby(K_STATS_SPINS, user_id, 1)
         if mega:
             await self.r.hincrby(K_STATS_SPINS_MEGA, user_id, 1)
+            if net_delta <= 0:
+                await self.r.hincrby(K_MEGA_LOSS_STREAK, user_id, 1)
+            else:
+                # reset by deleting the field (saves storage vs writing zero)
+                await self.r.hdel(K_MEGA_LOSS_STREAK, user_id)
+        
         if gross_total:
             await self.r.hincrbyfloat(K_STATS_WINNINGS, user_id, gross_total)
             await self.r.zincrby(K_LEADERBOARD, gross_total, user_id)
-
-        if net_delta <= 0:
-            await self.r.hincrby(K_MEGA_LOSS_STREAK, user_id, 1)
-        else:
-            # reset by deleting the field (saves storage vs writing zero)
-            await self.r.hdel(K_MEGA_LOSS_STREAK, user_id)
 
         user_name = getattr(interaction.user, "global_name", None) or interaction.user.name
 

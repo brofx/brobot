@@ -65,6 +65,8 @@ DUEL_TIMEOUT_SECONDS = 60 * 60 # 1 Hour
 DUEL_FEE_FRACTION = 0.10  # 10%
 DUEL_LEADERBOARD_LEN = 5
 REFRESH_THROTTLE_SECONDS = 30
+MEGA_LOSS_BONUS_INITIAL = 5   # first bonus multiplier after 1 consecutive net-loss
+MEGA_LOSS_BONUS_SCALE   = 5   # geometric growth factor (5 -> 5,25,125,...)
 
 # Redis keys
 K_MESSAGE_ID = "slots:message_id"
@@ -90,6 +92,7 @@ K_SIGMA_LAST   = "slots:sigma:last:{user_id}"
 K_SIGMA_LOCK   = "slots:sigma:lock:{user_id}"   # short TTL lock to prevent double submits
 K_MAINMSG_LAST_REFRESH = "slots:mainmsg:last_refresh"
 K_MAINMSG_REFRESH_LOCK = "slots:mainmsg:refresh_lock"
+K_MEGA_LOSS_STREAK = "slots:mega:loss_streak"  # hash user_id -> consecutive net-loss count
 
 # Optional: track mega spins separately
 K_STATS_SPINS_MEGA = "slots:stats:spins_mega"      # hash user_id -> total mega spins
@@ -980,9 +983,15 @@ class SlotsCog(commands.Cog):
             await self.r.incr(mkey)
             await self.r.expire(mkey, 60 * 60 * 48)
 
+            streak = int(await self.r.hget(K_MEGA_LOSS_STREAK, user_id) or 0)
+            if streak >= 1:
+                loss_bonus_mult = MEGA_LOSS_BONUS_INITIAL * (MEGA_LOSS_BONUS_SCALE ** (streak - 1))
+            else:
+                loss_bonus_mult = 1.0
+
 
         # Perform spin
-        bonus_mult = MEGA_PAYOUT_MULT if mega else 1.0
+        bonus_mult = MEGA_PAYOUT_MULT * loss_bonus_mult if mega else 1.0
         board_size = 7 if mega else 5
         grid, spin_total, breakdown, mult_used, grid_mult, total_mult = self._spin_and_score(
             cfg, bonus_multiplier=bonus_mult, size=board_size
@@ -1017,6 +1026,12 @@ class SlotsCog(commands.Cog):
         if gross_total:
             await self.r.hincrbyfloat(K_STATS_WINNINGS, user_id, gross_total)
             await self.r.zincrby(K_LEADERBOARD, gross_total, user_id)
+
+        if net_delta <= 0:
+            await self.r.hincrby(K_MEGA_LOSS_STREAK, user_id, 1)
+        else:
+            # reset by deleting the field (saves storage vs writing zero)
+            await self.r.hdel(K_MEGA_LOSS_STREAK, user_id)
 
         user_name = getattr(interaction.user, "global_name", None) or interaction.user.name
 
@@ -1079,12 +1094,14 @@ class SlotsCog(commands.Cog):
         if not mega:
             # Decide outcome text
             if net_delta > 0:
-                desc_lines.append(f"**You won:** {net_delta:,}")
+                desc_lines.append(f"**You won:** {net_delta:,} ({fmt_spin_value(net_delta, force=True)})")
             else:
                 desc_lines.append("No win this time!")
         else:
             # MEGA info block
             # Present gross, cost, net
+            if loss_bonus_mult > 1:
+                desc_lines.append(f"**Loss-bonus active:** ×{loss_bonus_mult:g} (MEGA loss streak {streak})")
             gross_line = f"Gross win (incl. MEGA x{MEGA_PAYOUT_MULT:.1f}): **{gross_total:,}** ({fmt_spin_value(gross_total, force=True)})"
             cost_line = f"MEGA cost (10%): **-{cost:,}** (-{fmt_spin_value(cost, force=True)})"
             net_line = f"**Net change:** **{net_delta:,}** ({fmt_spin_value(net_delta, force=True)})"

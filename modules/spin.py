@@ -666,8 +666,6 @@ class SlotsCog(commands.Cog):
             f"Total Cost: **{est_cost:,}** ({fmt_spin_value(est_cost, force=True)})\n"
             f"Cooldown: 5 minutes\n\n"
             "**Possible outcomes:**\n" + "\n".join(outcomes_hints) + "\n\n"
-            "_If an outcome refunds or spreads the cost, it comes from escrow. "
-            "Otherwise, the escrow is added to the jackpot._"
         )
 
         embed = discord.Embed(title="Σ Sigma Spin — Confirm", description=desc, color=discord.Color.dark_gold())

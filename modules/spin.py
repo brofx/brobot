@@ -1130,13 +1130,12 @@ class SlotsCog(commands.Cog):
         
         if tok_left < NORMAL_TOKENS_CAP and next_in > 0:
             # mins, secs = divmod(next_in, 60)
-            normal_spin_text = f"**Normal spins remaining:** {tok_left}/{NORMAL_TOKENS_CAP} (+1 <t:{spin_time_utc_sec + next_in}:R>)"
+            normal_spin_text = f"{tok_left}/{NORMAL_TOKENS_CAP} (+1 <t:{spin_time_utc_sec + next_in}:R>)"
         else:
-            normal_spin_text = f"**Normal spins remaining:** {tok_left}/{NORMAL_TOKENS_CAP}"
+            normal_spin_text = f"{tok_left}/{NORMAL_TOKENS_CAP}"
 
         used_after = int(await self.r.get(mega_plays_key(user.id, date_str)) or 0)
         remaining = max(0, MEGA_SPINS_PER_DAY - used_after)
-        player_summary = f"**Total Spins:** {total_spins}, **Current Score:** {total_wins_accum:g}"
 
         embed = discord.Embed(
             title=title,
@@ -1146,13 +1145,14 @@ class SlotsCog(commands.Cog):
         if jackpot_award > 0:
             desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:,} ({fmt_spin_value(jackpot_award, force=True)})")
         elif jackpot_contribution:
-            desc_lines.append(f"*{jackpot_contribution:,} ({fmt_spin_value(jackpot_contribution, force=True)}) added to jackpot*")
+            desc_lines.append(f"*{jackpot_contribution:g} added to jackpot*")
         if loss_streak_text:
             embed.add_field(name="Loss Bonus Active", value=loss_streak_text, inline=False)
         embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
         embed.add_field(name="Normal Spins Remaining", value=normal_spin_text, inline=True)
         embed.add_field(name="MEGA Spins Remaining", value=f"{remaining}/{MEGA_SPINS_PER_DAY}", inline=True)
-        embed.add_field(name="Player Summary", value=player_summary, inline=False)
+        embed.add_field(name="Total Spins", value=f"{total_spins}", inline=True)
+        embed.add_field(name="Current Score", value=f"{total_wins_accum:g}", inline=True)
         embed.timestamp = spin_time
 
         # Add the loss streak to the share message

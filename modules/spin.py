@@ -61,10 +61,10 @@ JACKPOT_MIN_MATCHES = 20
 COOLDOWN_SECONDS = 300  # 5 minutes
 NORMAL_TOKENS_CAP = 6   # up to 5 stored normal spins
 BIGGEST_SPINS_LEN = 5
-DUEL_TIMEOUT_SECONDS = 60 * 60 # 1 Hour
+DUEL_TIMEOUT_SECONDS = 60 * 30 # 30 minutes
 DUEL_FEE_FRACTION = 0.10  # 10%
 DUEL_LEADERBOARD_LEN = 5
-REFRESH_THROTTLE_SECONDS = 30
+REFRESH_THROTTLE_SECONDS = 10
 MEGA_LOSS_BONUS_INITIAL = 5   # first bonus multiplier after 1 consecutive net-loss
 MEGA_LOSS_BONUS_SCALE   = 5   # geometric growth factor (5 -> 5,25,125,...)
 MEGA_LOSS_STREAK_LB_LEN = 5
@@ -1260,11 +1260,6 @@ class SlotsCog(commands.Cog):
     async def accept_duel(self, interaction: discord.Interaction, view: DuelAcceptView):
         now = int(datetime.now(tz=NY_TZ).timestamp())
 
-        # Single accept guard
-        lock_key = K_DUEL_LOCK.format(message_id=view.message_id)
-        if not await self.r.set(lock_key, "1", ex=DUEL_TIMEOUT_SECONDS, nx=True):
-            return await interaction.response.send_message("This 1v1 was already accepted or closed.", ephemeral=True)
-
         data = await self.r.get(view.duel_key)
         if not data:
             return await interaction.response.send_message("This 1v1 has expired.", ephemeral=True)
@@ -1284,6 +1279,11 @@ class SlotsCog(commands.Cog):
             return await interaction.response.send_message(
                 f"You need at least **{init_fee:,}** ({fmt_spin_value(init_fee, force=True)}) points to accept this 1v1.", ephemeral=True
             )
+        
+        # Single accept guard
+        lock_key = K_DUEL_LOCK.format(message_id=view.message_id)
+        if not await self.r.set(lock_key, "1", ex=DUEL_TIMEOUT_SECONDS, nx=True):
+            return await interaction.response.send_message("This 1v1 was already accepted or closed.", ephemeral=True)
 
         # Deduct opponent fee now
         pipe = self.r.pipeline()

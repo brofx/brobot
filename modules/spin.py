@@ -757,7 +757,7 @@ class SlotsCog(commands.Cog):
                 pipe.hincrbyfloat(K_STATS_WINNINGS, uid, escrow + bonus)
                 pipe.zincrby(K_LEADERBOARD, escrow + bonus, uid)
                 await pipe.execute()
-                summary_lines.append(f"Outcome: **Refund + {int(bonus_fraction * 100)}%** +{escrow + bonus:,} ({fmt_spin_value(escrow + bonus, force=True)}).")
+                summary_lines.append(f"Outcome: Win **{(1 + bonus_fraction):.1f}x** = {escrow + bonus:,} ({fmt_spin_value(escrow + bonus, force=True)})!")
                 escrow = 0  # fully returned to user (and more)
 
             elif choice_id == "spread_cost_others":

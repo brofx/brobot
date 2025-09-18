@@ -1121,7 +1121,11 @@ class SlotsCog(commands.Cog):
             desc_lines.extend([gross_line, cost_line, net_line])
 
         if breakdown:
-            desc_lines += [f"- {line}" for line in breakdown]
+            breakdown_max = 5
+            desc_lines += [f"- {line}" for line in breakdown[0:breakdown_max]]
+            excluded = max(0, len(breakdown) - breakdown_max)
+            if excluded:
+                desc_lines.append(f"...and {excluded} more!")
 
         desc_lines.append(f"**Total multiplier:** {total_mult:g}×")
 

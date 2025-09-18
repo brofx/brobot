@@ -662,8 +662,9 @@ class SlotsCog(commands.Cog):
         outcomes_hints = [x.label for x in cfg.sigma.wheel]
 
         desc = (
-            f"Cost (escrowed): **{est_cost:,}**\n"
-            f"Cooldown: 5 minutes (cap **1**)\n\n"
+            f"Sigma Fee: **{int(cfg.sigma.cost_fraction * 100)}%**\n"
+            f"Total Cost: **{est_cost:,}** ({fmt_spin_value(est_cost, force=True)})\n"
+            f"Cooldown: 5 minutes\n\n"
             "**Possible outcomes:**\n" + "\n".join(outcomes_hints) + "\n\n"
             "_If an outcome refunds or spreads the cost, it comes from escrow. "
             "Otherwise, the escrow is added to the jackpot._"
@@ -762,7 +763,7 @@ class SlotsCog(commands.Cog):
                 if recipients:
                     per = distributed // len(recipients)
                     summary_lines.append(f"Outcome: **Spread cost** — {distributed:,} ({fmt_spin_value(distributed, force=True)}) points shared to **{len(recipients)}** others.")
-                    share_thread_note = f"Σ Sigma: <@{uid}> spread **{distributed:,}** ({fmt_spin_value(distributed, force=True)}) points to **{len(recipients)}** players. Each player receives **{per:,}** ({fmt_spin_value(per, force=True)})."
+                    share_thread_note = f"Σ Sigma: <@{uid}> spread **{int(cfg.sigma.cost_fraction * 100)}%** of their balance: **{distributed:,}** ({fmt_spin_value(distributed, force=True)}) to **{len(recipients)}** everyone. Each player receives **{per:,}** ({fmt_spin_value(per, force=True)})."
                 else:
                     # no one else to share with → refund
                     pipe = self.r.pipeline()

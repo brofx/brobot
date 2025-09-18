@@ -1102,6 +1102,7 @@ class SlotsCog(commands.Cog):
 
         desc_lines = []
         title = "🎰 Your Spin Result" if not mega else "🤖 MEGA Spin Result"
+        loss_streak_text = ""
 
         if not mega:
             # Decide outcome text
@@ -1113,7 +1114,7 @@ class SlotsCog(commands.Cog):
             # MEGA info block
             # Present gross, cost, net
             if loss_bonus_mult > 1:
-                desc_lines.append(f"**Loss-bonus active:** ×{loss_bonus_mult:g} (MEGA loss streak {streak})")
+                loss_streak_text = f"MEGA loss streak of {streak} = ×{loss_bonus_mult:g}"
             gross_line = f"Gross win (incl. MEGA x{MEGA_PAYOUT_MULT:.1f}): **{gross_total:,}** ({fmt_spin_value(gross_total, force=True)})"
             cost_line = f"MEGA cost (10%): **-{cost:,}** (-{fmt_spin_value(cost, force=True)})"
             net_line = f"**Net change:** **{net_delta:,}** ({fmt_spin_value(net_delta, force=True)})"
@@ -1126,17 +1127,16 @@ class SlotsCog(commands.Cog):
 
         # show remaining tokens and next refill
         tok_left, next_in = await self._refill_normal_tokens(user.id)
+        
         if tok_left < NORMAL_TOKENS_CAP and next_in > 0:
             # mins, secs = divmod(next_in, 60)
-            desc_lines.append(f"**Normal spins remaining:** {tok_left}/{NORMAL_TOKENS_CAP} (+1 <t:{spin_time_utc_sec + next_in}:R>)")
+            normal_spin_text = f"**Normal spins remaining:** {tok_left}/{NORMAL_TOKENS_CAP} (+1 <t:{spin_time_utc_sec + next_in}:R>)"
         else:
-            desc_lines.append(f"**Normal spins remaining:** {tok_left}/{NORMAL_TOKENS_CAP}")
+            normal_spin_text = f"**Normal spins remaining:** {tok_left}/{NORMAL_TOKENS_CAP}"
 
         used_after = int(await self.r.get(mega_plays_key(user.id, date_str)) or 0)
         remaining = max(0, MEGA_SPINS_PER_DAY - used_after)
-        desc_lines.append(f"**MEGA spins remaining:** {remaining}/{MEGA_SPINS_PER_DAY}")
-
-        desc_lines.append(f"**Your totals:** spins={total_spins}, points={total_wins_accum:,}, avg/spin={avg:,.2f}")
+        player_summary = f"**Total Spins:** {total_spins}, **Current Score:** {total_wins_accum:g}"
 
         embed = discord.Embed(
             title=title,
@@ -1147,10 +1147,16 @@ class SlotsCog(commands.Cog):
             desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:,} ({fmt_spin_value(jackpot_award, force=True)})")
         elif jackpot_contribution:
             desc_lines.append(f"*{jackpot_contribution:,} ({fmt_spin_value(jackpot_contribution, force=True)}) added to jackpot*")
-        
+        if loss_streak_text:
+            embed.add_field(name="Loss Bonus Active", value=loss_streak_text, inline=False)
         embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
+        embed.add_field(name="Normal Spins Remaining", value=normal_spin_text, inline=True)
+        embed.add_field(name="MEGA Spins Remaining", value=f"{remaining}/{MEGA_SPINS_PER_DAY}", inline=True)
+        embed.add_field(name="Player Summary", value=player_summary, inline=False)
         embed.timestamp = spin_time
 
+        # Add the loss streak to the share message
+        desc_lines.insert(0, loss_streak_text)
         logger.info("\n\t".join([user_name] + desc_lines))
 
         view = ResultShareView(

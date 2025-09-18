@@ -67,6 +67,7 @@ DUEL_LEADERBOARD_LEN = 5
 REFRESH_THROTTLE_SECONDS = 30
 MEGA_LOSS_BONUS_INITIAL = 5   # first bonus multiplier after 1 consecutive net-loss
 MEGA_LOSS_BONUS_SCALE   = 5   # geometric growth factor (5 -> 5,25,125,...)
+MEGA_LOSS_STREAK_LB_LEN = 5
 
 # Redis keys
 K_MESSAGE_ID = "slots:message_id"
@@ -93,6 +94,8 @@ K_SIGMA_LOCK   = "slots:sigma:lock:{user_id}"   # short TTL lock to prevent doub
 K_MAINMSG_LAST_REFRESH = "slots:mainmsg:last_refresh"
 K_MAINMSG_REFRESH_LOCK = "slots:mainmsg:refresh_lock"
 K_MEGA_LOSS_STREAK = "slots:mega:loss_streak"  # hash user_id -> consecutive net-loss count
+K_MEGA_LOSS_STREAK_BEST    = "slots:mega:loss_streak:best"     # hash user_id -> best-ever consecutive net-loss count
+K_MEGA_LOSS_STREAK_BEST_TS = "slots:mega:loss_streak:best_ts"  # hash user_id -> epoch seconds when best was last achieved
 
 # Optional: track mega spins separately
 K_STATS_SPINS_MEGA = "slots:stats:spins_mega"      # hash user_id -> total mega spins
@@ -518,7 +521,9 @@ class SlotsCog(commands.Cog):
             K_DUEL_LOSSES,
             K_BIGGEST_SPINS,          # legacy
             K_BIGGEST_SPINS_MEGA,     # new
-            K_BIGGEST_SPINS_NORMAL
+            K_BIGGEST_SPINS_NORMAL,
+            K_MEGA_LOSS_STREAK_BEST,
+            K_MEGA_LOSS_STREAK_BEST_TS
         )
 
         try:
@@ -1023,7 +1028,15 @@ class SlotsCog(commands.Cog):
         if mega:
             await self.r.hincrby(K_STATS_SPINS_MEGA, user_id, 1)
             if net_delta <= 0:
+                new_streak = (streak + 1)
                 await self.r.hincrby(K_MEGA_LOSS_STREAK, user_id, 1)
+                best_so_far = int(await self.r.hget(K_MEGA_LOSS_STREAK_BEST, user_id) or 0)
+                if new_streak > best_so_far:
+                    now_ts = int(datetime.now(tz=NY_TZ).timestamp())
+                    pipe = self.r.pipeline()
+                    pipe.hset(K_MEGA_LOSS_STREAK_BEST, user_id, new_streak)
+                    pipe.hset(K_MEGA_LOSS_STREAK_BEST_TS, user_id, now_ts)
+                    await pipe.execute()
             else:
                 # reset by deleting the field (saves storage vs writing zero)
                 await self.r.hdel(K_MEGA_LOSS_STREAK, user_id)
@@ -1820,11 +1833,46 @@ class SlotsCog(commands.Cog):
             color=discord.Color.gold(),
             timestamp=datetime.now(tz=NY_TZ)
         )
+
+        # MEGA Loss Streaks (All-Time)
+        best_map = await self.r.hgetall(K_MEGA_LOSS_STREAK_BEST)      # user_id -> best count
+        best_ts  = await self.r.hgetall(K_MEGA_LOSS_STREAK_BEST_TS)   # user_id -> epoch seconds
+
+        rows = []
+        for uid_str, best_str in (best_map or {}).items():
+            try:
+                uid = int(uid_str)
+                best = int(best_str)
+                if best <= 0:
+                    continue
+                ts = int(best_ts.get(uid_str, "0") or 0)
+                rows.append((uid, best, ts))
+            except Exception:
+                continue
+
+        # sort: best desc, then most recently achieved desc
+        rows.sort(key=lambda t: (t[1], t[2]), reverse=True)
+
+        lines: List[str] = []
+        if rows:
+            for i, (uid, best, ts) in enumerate(rows[:MEGA_LOSS_STREAK_LB_LEN], start=1):
+                # bonus corresponding to that best streak (what they would have gotten on the next MEGA then)
+                if best >= 1:
+                    bonus = MEGA_LOSS_BONUS_INITIAL * (MEGA_LOSS_BONUS_SCALE ** (best - 1))
+                else:
+                    bonus = 1
+                when = f" • <t:{ts}:R>" if ts > 0 else ""
+                lines.append(f"`{i:>2}.` <@{uid}> — **{best}** (bonus ×{bonus:g}){when}")
+        else:
+            lines.append("_No records yet._")
+
+
         embed.add_field(name=f"Progressive Jackpot ({JACKPOT_MIN_MATCHES}+ Matching Symbols)", value=f"{pool_val:,} (**{pool_fmtd}**)\n**+{JACKPOT_NORMAL_INC_FRACTION * 100}%** per normal spin", inline=False)
         embed.add_field(name=f"Leaderboard (Top {LEADERBOARD_LEN})", value="\n".join(lb_lines), inline=False)
         embed.add_field(name=mega_title, value="\n".join(mega_lines), inline=False)
         embed.add_field(name=norm_title, value="\n".join(norm_lines), inline=False)
         embed.add_field(name="Recent Big Wins", value="\n".join(feed_lines), inline=False)
+        embed.add_field(name="MEGA Loss Streaks (All-Time)", value="\n".join(lines), inline=False)
         wins_map = await self.r.hgetall(K_DUEL_WINS)
         loss_map = await self.r.hgetall(K_DUEL_LOSSES)
 

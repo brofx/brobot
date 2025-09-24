@@ -1115,8 +1115,8 @@ class SlotsCog(commands.Cog):
             # Present gross, cost, net
             if loss_bonus_mult > 1:
                 loss_streak_text = f"MEGA loss streak of {streak} = ×{loss_bonus_mult:g}"
-            gross_line = f"Gross win (incl. MEGA x{MEGA_PAYOUT_MULT:.1f}): **{gross_total:g}**"
-            cost_line = f"MEGA cost (10%): **-{cost:g}**"
+            gross_line = f"Gross win: **{gross_total:g}**"
+            cost_line = f"MEGA cost: **-{cost:g}**"
             net_line = f"**Net change:** **{net_delta:g}**"
             desc_lines.extend([gross_line, cost_line, net_line])
 

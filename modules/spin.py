@@ -1245,7 +1245,7 @@ class SlotsCog(commands.Cog):
         rank_idx, total_ranked = await pipe.execute()
 
         if rank_idx is not None:
-            rank_field = f"**#{ordinal(rank_idx + 1)}** of **{total_ranked}**"
+            rank_field = f"**{ordinal(rank_idx + 1)}** of **{total_ranked}**"
         else:
             # user might not be in the zset yet (e.g., zero score on a normal spin)
             rank_field = f"— of **{total_ranked}**"

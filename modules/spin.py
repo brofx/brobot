@@ -320,6 +320,24 @@ class ResultShareView(discord.ui.View):
         self.color = color
         self.spin_time = spin_time
 
+    @discord.ui.button(label="🎰 Spin Again", style=discord.ButtonStyle.primary, custom_id="slots:result:spin_again")
+    async def spin_again(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            return await interaction.response.send_message("Only the original spinner can use these buttons.", ephemeral=True)
+        cog: "SlotsCog" = interaction.client.get_cog("SlotsCog")  # type: ignore
+        if not cog:
+            return await interaction.response.send_message("Slots are temporarily unavailable.", ephemeral=True)
+        await cog.handle_spin(interaction, mega=False, edit_in_place=True)
+
+    @discord.ui.button(label="🤖 MEGA Again", style=discord.ButtonStyle.success, custom_id="slots:result:mega_again")
+    async def mega_again(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            return await interaction.response.send_message("Only the original spinner can use these buttons.", ephemeral=True)
+        cog: "SlotsCog" = interaction.client.get_cog("SlotsCog")  # type: ignore
+        if not cog:
+            return await interaction.response.send_message("Slots are temporarily unavailable.", ephemeral=True)
+        await cog.handle_spin(interaction, mega=True, edit_in_place=True)
+
     @discord.ui.button(label="📣 Share to thread", style=discord.ButtonStyle.secondary, custom_id="slots:share_result")
     async def share(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.author_id:
@@ -343,7 +361,8 @@ class ResultShareView(discord.ui.View):
             description=self.share_description,
             color=self.color
         )
-        embed.add_field(name="Summary", value=self.summary, inline=False)
+        if self.summary:
+            embed.add_field(name="Summary", value=self.summary, inline=False)
         embed.timestamp = self.spin_time
 
         try:
@@ -639,6 +658,7 @@ class SlotsCog(commands.Cog):
         """Show an ephemeral confirmation with the outcomes & a Spin button."""
         await self._ensure_config_for_today()
         user = interaction.user
+        user_name = getattr(interaction.user, "global_name", None) or interaction.user.name
         uid = str(user.id)
         cfg = self._config
 
@@ -649,6 +669,7 @@ class SlotsCog(commands.Cog):
         tokens, next_in = await self._refill_sigma_tokens(user.id)
         if tokens <= 0:
             now = int(datetime.now(tz=NY_TZ).timestamp())
+            logger.info(f"[{user_name}] No Σ Sigma spins available.")
             return await interaction.response.send_message(
                 f"No Σ Sigma available. Next charge **<t:{now + next_in}:R>**.",
                 ephemeral=True
@@ -658,6 +679,7 @@ class SlotsCog(commands.Cog):
         points = int(await self.r.hget(K_STATS_WINNINGS, uid) or 0)
         est_cost = max(cfg.sigma.min_points, int(points * cfg.sigma.cost_fraction))
         if points < est_cost or est_cost <= 0:
+            logger.info(f"[{user_name}] No Σ Sigma spins available, not enough points.")
             return await interaction.response.send_message(
                 f"You need **≥ {cfg.sigma.min_points:,}** points and will be charged **25%** of your balance to spin.",
                 ephemeral=True
@@ -682,6 +704,7 @@ class SlotsCog(commands.Cog):
         """Resolve Sigma spin after user confirms."""
         await self._ensure_config_for_today()
         user = interaction.user
+        user_name = getattr(interaction.user, "global_name", None) or interaction.user.name
         uid = str(user.id)
         now = int(datetime.now(tz=NY_TZ).timestamp())
         cfg = self._config
@@ -691,12 +714,14 @@ class SlotsCog(commands.Cog):
         # Lock to prevent double submits
         lock_key = K_SIGMA_LOCK.format(user_id=user.id)
         if not await self.r.set(lock_key, "1", ex=10, nx=True):
+            logger.info(f"[{user_name}] Another Sigma is already processing.")
             return await interaction.response.send_message("Another Sigma is already processing.", ephemeral=True)
 
         try:
             # Token check/consume
             tokens, _ = await self._refill_sigma_tokens(user.id)
             if tokens <= 0:
+                logger.info(f"[{user_name}] No Σ Sigma spins available.")
                 return await interaction.response.send_message("No Σ Sigma available right now.", ephemeral=True)
             await self.r.decr(K_SIGMA_TOKENS.format(user_id=user.id))
 
@@ -705,6 +730,7 @@ class SlotsCog(commands.Cog):
             cost = max(cfg.sigma.min_points, int(points * cfg.sigma.cost_fraction))
             if points < cost or cost <= 0:
                 # give token back (gracefully) if they lost points meanwhile
+                logger.info(f"[{user_name}] No Σ Sigma spins available, not enough points.")
                 await self.r.incr(K_SIGMA_TOKENS.format(user_id=user.id))
                 return await interaction.response.send_message(
                     f"Balance changed — you need **≥ {cfg.sigma.min_points:,}** and 25% cost available.",
@@ -819,6 +845,7 @@ class SlotsCog(commands.Cog):
                 color=discord.Color.dark_gold(),
                 timestamp=datetime.now(tz=NY_TZ)
             )
+            logger.info("\n\t".join([f"{user_name} Sigma"] + summary_lines))
 
             # Announce to thread for global effects
             if share_thread_note:
@@ -919,15 +946,28 @@ class SlotsCog(commands.Cog):
             await self.r.incrbyfloat(K_JACKPOT_POOL, remainder)
 
         return per * len(recipients), recipients
+    
+    def _make_result_view(self, interaction: discord.Interaction, embed: discord.Embed, summary: str = "") -> discord.ui.View:
+        return ResultShareView(
+            bot=self.bot,
+            thread_id=SHARE_THREAD_ID,
+            author_id=interaction.user.id,
+            share_title=embed.title or "Spin Result",
+            share_description=embed.description or "",
+            summary=summary,
+            color=embed.color or discord.Color.green(),
+            spin_time=datetime.now(tz=NY_TZ),
+        )
 
     # ---------------- Spin handling (button interaction) ----------------
 
-    async def handle_spin(self, interaction: discord.Interaction, *, mega: bool):
+    async def handle_spin(self, interaction: discord.Interaction, *, mega: bool, edit_in_place: bool = False):
         await self._ensure_config_for_today()
         assert self._config is not None
         cfg = self._config
 
         user = interaction.user
+        user_name = getattr(interaction.user, "global_name", None) or interaction.user.name
         user_id = str(user.id)
         spin_time = datetime.now(tz=NY_TZ)
         spin_time_utc_sec = int(spin_time.timestamp())
@@ -939,12 +979,19 @@ class SlotsCog(commands.Cog):
             # token-bucket check
             tokens, next_in = await self._refill_normal_tokens(user.id)
             if tokens <= 0:
-                #mins, secs = divmod(next_in, 60)
-                return await interaction.response.send_message(
-                    f"No normal spins available. Next spin available **<t:{spin_time_utc_sec + next_in}:R>** "
-                    f"\n(you can store up to **{NORMAL_TOKENS_CAP}**).",
-                    ephemeral=True
+                # Build a lightweight status embed and EDIT the original message if requested
+                status = discord.Embed(
+                    title="🎰 No normal spins available",
+                    description=f"Next spin **<t:{spin_time_utc_sec + next_in}:R>**\n"
+                                f"(you can store up to **{NORMAL_TOKENS_CAP}**).",
+                    color=discord.Color.dark_gray()
                 )
+                status.timestamp = spin_time
+                logger.info(f"[{user_name}] 🎰 No normal spins available.")
+                if edit_in_place:
+                    return await interaction.response.edit_message(embed=status, view=self._make_result_view(interaction, status))
+                else:
+                    return await interaction.response.send_message(embed=status, ephemeral=True)
             # consume one token
             await self.r.decr(K_NORMAL_TOKENS.format(user_id=user.id))
 
@@ -962,17 +1009,32 @@ class SlotsCog(commands.Cog):
             mkey = mega_plays_key(user.id, date_str)
             used = int(await self.r.get(mkey) or 0)
             if used >= MEGA_SPINS_PER_DAY:
-                return await interaction.response.send_message(
-                    f"You've used your **{MEGA_SPINS_PER_DAY}** MEGA spins for today. Come back after midnight ET or try a **Sigma** spin to refill some MEGA spins!",
-                    ephemeral=True
+                msg = discord.Embed(
+                    title="🤖 No MEGA spins available",
+                    description=f"You've used your **{MEGA_SPINS_PER_DAY}** MEGA spins for today. "
+                                f"Come back after midnight ET or try a **Sigma** spin to refill some MEGA spins!",
+                    color=discord.Color.dark_gray()
                 )
+                msg.timestamp = spin_time
+                logger.info(f"[{user_name}] 🤖 No MEGA spins available.")
+                if edit_in_place:
+                    return await interaction.response.edit_message(embed=msg, view=self._make_result_view(interaction, msg))
+                else:
+                    return await interaction.response.send_message(embed=msg, ephemeral=True)
 
             total_points = int(await self.r.hget(K_STATS_WINNINGS, user_id) or 0)
             if total_points <= MEGA_MIN_POINTS:
-                return await interaction.response.send_message(
-                    f"MEGA spins require **> {MEGA_MIN_POINTS:,}** points. You currently have **{total_points:,}**.",
-                    ephemeral=True
+                msg = discord.Embed(
+                    title="🤖 No MEGA spins available",
+                    description=f"MEGA spins require **> {MEGA_MIN_POINTS:,}** points. You currently have **{total_points:,}**.",
+                    color=discord.Color.dark_gray()
                 )
+                msg.timestamp = spin_time
+                logger.info(f"[{user_name}] 🤖 No MEGA spins available, not enough points.")
+                if edit_in_place:
+                    return await interaction.response.edit_message(embed=msg, view=self._make_result_view(interaction, msg))
+                else:
+                    return await interaction.response.send_message(embed=msg, ephemeral=True)
             cost = max(1, int(total_points * MEGA_COST_FRACTION))
 
             # Deduct cost up-front and add to the progressive jackpot
@@ -1045,8 +1107,6 @@ class SlotsCog(commands.Cog):
             await self.r.hincrbyfloat(K_STATS_WINNINGS, user_id, gross_total)
             await self.r.zincrby(K_LEADERBOARD, gross_total, user_id)
 
-        user_name = getattr(interaction.user, "global_name", None) or interaction.user.name
-
         if net_delta > 0:
             biggest_entry = {
                 "user_id": int(user_id),
@@ -1098,7 +1158,7 @@ class SlotsCog(commands.Cog):
 
         total_spins = int(await self.r.hget(K_STATS_SPINS, user_id) or 0)
         total_wins_accum = int(await self.r.hget(K_STATS_WINNINGS, user_id) or 0)
-        avg = (total_wins_accum / total_spins) if total_spins > 0 else 0.0
+        # avg = (total_wins_accum / total_spins) if total_spins > 0 else 0.0
 
         desc_lines = []
         title = "🎰 Your Spin Result" if not mega else "🤖 MEGA Spin Result"
@@ -1131,12 +1191,6 @@ class SlotsCog(commands.Cog):
 
         # show remaining tokens and next refill
         tok_left, next_in = await self._refill_normal_tokens(user.id)
-        
-        if tok_left < NORMAL_TOKENS_CAP and next_in > 0:
-            # mins, secs = divmod(next_in, 60)
-            normal_spin_text = f"{tok_left}/{NORMAL_TOKENS_CAP} (+1 <t:{spin_time_utc_sec + next_in}:R>)"
-        else:
-            normal_spin_text = f"{tok_left}/{NORMAL_TOKENS_CAP}"
 
         used_after = int(await self.r.get(mega_plays_key(user.id, date_str)) or 0)
         remaining = max(0, MEGA_SPINS_PER_DAY - used_after)
@@ -1158,8 +1212,14 @@ class SlotsCog(commands.Cog):
         if loss_streak_text:
             embed.add_field(name="Loss Bonus Active", value=loss_streak_text, inline=False)
         embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
-        embed.add_field(name="Normal Spins Remaining", value=normal_spin_text, inline=True)
+        embed.add_field(name="Normal Spins Remaining", value=f"{tok_left}/{NORMAL_TOKENS_CAP}", inline=True)
         embed.add_field(name="MEGA Spins Remaining", value=f"{remaining}/{MEGA_SPINS_PER_DAY}", inline=True)
+        
+        if tok_left < NORMAL_TOKENS_CAP and next_in > 0:
+            embed.add_field(name="Next Normal Refill", value=f"<t:{spin_time_utc_sec + next_in}:R>", inline=True)
+        if remaining < MEGA_SPINS_PER_DAY:
+            embed.add_field(name="Next MEGA Refill", value=f"<t:{next_midnight_et_epoch()}:R>", inline=True)
+        
         embed.add_field(name="Total Spins", value=f"{total_spins}", inline=True)
         embed.add_field(name="Current Score", value=f"{total_wins_accum:g}", inline=True)
         embed.timestamp = spin_time
@@ -1168,21 +1228,29 @@ class SlotsCog(commands.Cog):
         desc_lines.insert(0, loss_streak_text)
         logger.info("\n\t".join([user_name] + desc_lines))
 
-        view = ResultShareView(
-            bot=self.bot,
-            thread_id=SHARE_THREAD_ID,
-            author_id=user.id,
-            share_title=title,
-            share_description=grid_str,
-            summary="\n".join(desc_lines),
-            color=embed.color,
-            spin_time=spin_time
-        )
+        # view = ResultShareView(
+        #     bot=self.bot,
+        #     thread_id=SHARE_THREAD_ID,
+        #     author_id=user.id,
+        #     share_title=title,
+        #     share_description=grid_str,
+        #     summary="\n".join(desc_lines),
+        #     color=embed.color,
+        #     spin_time=spin_time
+        # )
+        view = self._make_result_view(interaction, embed, "\n".join(desc_lines))
 
-        if interaction.response.is_done():
-            await interaction.followup.send(embed=embed, ephemeral=True, view=view)
+        if edit_in_place:
+            # overwrite this original ephemeral result message
+            if interaction.response.is_done():
+                await interaction.edit_original_response(embed=embed, view=view)
+            else:
+                await interaction.response.edit_message(embed=embed, view=view)
         else:
-            await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
+            if interaction.response.is_done():
+                await interaction.followup.send(embed=embed, ephemeral=True, view=view)
+            else:
+                await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
 
     # Replace your start_duel method with this version (auto-cleans stale mappings before blocking)
     async def start_duel(self, interaction: discord.Interaction):
@@ -1265,6 +1333,7 @@ class SlotsCog(commands.Cog):
             "channel_id": posted.channel.id,
             "message_id": posted.id
         }
+        logger.info(f"[{duel_obj['initiator_name']}] ⚔️ Start Duel {json.dumps(duel_obj, indent=2)}")
         pipe = self.r.pipeline()
         pipe.set(duel_key, json.dumps(duel_obj), ex=DUEL_TIMEOUT_SECONDS + 120)
         pipe.hset(K_DUEL_ACTIVE_BY_USER, uid, posted.id)
@@ -1274,16 +1343,21 @@ class SlotsCog(commands.Cog):
 
     async def accept_duel(self, interaction: discord.Interaction, view: DuelAcceptView):
         now = int(datetime.now(tz=NY_TZ).timestamp())
+        user = interaction.user
+        user_name = getattr(interaction.user, "global_name", None) or interaction.user.name
 
         data = await self.r.get(view.duel_key)
         if not data:
+            logger.info(f"[{user_name}] This 1v1 has expired (Unknown 1v1).")
             return await interaction.response.send_message("This 1v1 has expired.", ephemeral=True)
         obj = json.loads(data)
         if obj.get("state") != "open" or now >= int(obj["expires_at"]):
+            logger.info(f"[{user_name}] This 1v1 has expired (Not open or is expired).")
             return await interaction.response.send_message("This 1v1 has expired.", ephemeral=True)
 
         initiator_id = int(obj["initiator_id"])
         if interaction.user.id == initiator_id:
+            logger.info(f"[{user_name}] You can't accept your own 1v1.")
             return await interaction.response.send_message("You can't accept your own 1v1.", ephemeral=True)
 
         # Opponent pays the SAME fixed fee as calculated from the initiator
@@ -1291,6 +1365,7 @@ class SlotsCog(commands.Cog):
         opp_uid = str(interaction.user.id)
         opp_points = int(await self.r.hget(K_STATS_WINNINGS, opp_uid) or 0)
         if opp_points < init_fee:
+            logger.info(f"[{user_name}] Not enough points to 1v1.")
             return await interaction.response.send_message(
                 f"You need at least **{init_fee:g}** points to accept this 1v1.", ephemeral=True
             )
@@ -1298,6 +1373,7 @@ class SlotsCog(commands.Cog):
         # Single accept guard
         lock_key = K_DUEL_LOCK.format(message_id=view.message_id)
         if not await self.r.set(lock_key, "1", ex=DUEL_TIMEOUT_SECONDS, nx=True):
+            logger.info(f"[{user_name}] This 1v1 was already accepted or closed.")
             return await interaction.response.send_message("This 1v1 was already accepted or closed.", ephemeral=True)
 
         # Deduct opponent fee now
@@ -1410,6 +1486,7 @@ class SlotsCog(commands.Cog):
         embed = discord.Embed(title="⚔️ 1v1 Result", description=desc, color=color)
         embed.add_field(name="Stakes & Pot", value=stakes, inline=False)
         embed.add_field(name="Outcome", value=outcome, inline=False)
+        logger.info(f"[{initiator_id} ⚔️ {user_name}] 🥇 {winner_id or "Split"}\n{desc}")
 
         # Send results to the SHARE_THREAD_ID (silent). Fallback to current channel if not found.
         target = self.bot.get_channel(SHARE_THREAD_ID)
@@ -1458,20 +1535,25 @@ class SlotsCog(commands.Cog):
             pass
 
     async def cancel_duel(self, interaction: discord.Interaction, view: "DuelAcceptView"):
+        user_name = getattr(interaction.user, "global_name", None) or interaction.user.name
         # Only the initiator can cancel
         if interaction.user.id != view.initiator_id:
+            logger.info(f"[{user_name}] Only the challenger can cancel this 1v1.")
             return await interaction.response.send_message("Only the challenger can cancel this 1v1.", ephemeral=True)
 
         # Acquire same lock used by accept to prevent races
         lock_key = K_DUEL_LOCK.format(message_id=view.message_id)
         if not await self.r.set(lock_key, "1", ex=DUEL_TIMEOUT_SECONDS, nx=True):
+            logger.info(f"[{user_name}] This 1v1 was already accepted or closed (lock).")
             return await interaction.response.send_message("This 1v1 was already accepted or closed.", ephemeral=True)
 
         data = await self.r.get(view.duel_key)
         if not data:
+            logger.info(f"[{user_name}] This 1v1 is no longer active")
             return await interaction.response.send_message("This 1v1 is no longer active.", ephemeral=True)
         obj = json.loads(data)
         if obj.get("state") != "open":
+            logger.info(f"[{user_name}] This 1v1 was already accepted or closed (state).")
             return await interaction.response.send_message("This 1v1 was already accepted or closed.", ephemeral=True)
 
         # Mark cancelled & refund initiator's fee
@@ -1486,6 +1568,8 @@ class SlotsCog(commands.Cog):
         pipe.hdel(K_DUEL_ACTIVE_BY_USER, uid)
         pipe.delete(view.duel_key)
         await pipe.execute()
+
+        logger.info(f"[{user_name}] Cancelled their duel.")
 
         # Disable buttons and delete the challenge message (it also had delete_after, but remove now to de-clutter)
         for item in view.children:

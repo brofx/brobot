@@ -1224,15 +1224,18 @@ class SlotsCog(commands.Cog):
             desc_lines.append(f"*{jackpot_contribution:g} added to jackpot*")
         if loss_streak_text:
             embed.add_field(name="Loss Bonus Active", value=loss_streak_text, inline=False)
-        embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
-        embed.add_field(name="Normal Spins Remaining", value=f"{tok_left}/{NORMAL_TOKENS_CAP}", inline=True)
-        embed.add_field(name="MEGA Spins Remaining", value=f"{remaining}/{MEGA_SPINS_PER_DAY}", inline=True)
-        
+
+        normal_tok_text = f"{tok_left}/{NORMAL_TOKENS_CAP}"
+        mega_tok_text = f"{remaining}/{MEGA_SPINS_PER_DAY}"
+
         if tok_left < NORMAL_TOKENS_CAP and next_in > 0:
-            embed.add_field(name="Next Normal Refill", value=f"<t:{spin_time_utc_sec + next_in}:R>", inline=True)
+            normal_tok_text += f"+1 <t:{spin_time_utc_sec + next_in}:R>"
         if remaining < MEGA_SPINS_PER_DAY:
-            embed.add_field(name="Next MEGA Refill", value=f"<t:{next_midnight_et_epoch()}:R>", inline=True)
-        
+            mega_tok_text += f"+{MEGA_SPINS_PER_DAY} <t:{next_midnight_et_epoch()}:R>"
+
+        embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
+        embed.add_field(name="Normal Spins", value=normal_tok_text, inline=True)
+        embed.add_field(name="MEGA Spins", value=mega_tok_text, inline=True)
         embed.add_field(name="Total Spins", value=f"{total_spins}", inline=True)
         embed.add_field(name="Current Score", value=f"{total_wins_accum:g}", inline=True)
         # Fetch current rank (0-based) and total ranked players

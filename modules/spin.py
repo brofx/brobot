@@ -1141,10 +1141,15 @@ class SlotsCog(commands.Cog):
         used_after = int(await self.r.get(mega_plays_key(user.id, date_str)) or 0)
         remaining = max(0, MEGA_SPINS_PER_DAY - used_after)
 
+        if mega:
+            embed_color = discord.Color.orange() if net_delta > 0 else discord.Color.red()
+        else:
+            embed_color = discord.Color.green() if net_delta > 0 else discord.Color.dark_gray()
+
         embed = discord.Embed(
             title=title,
             description=grid_str,
-            color=discord.Color.orange() if mega else (discord.Color.green() if net_delta > 0 else discord.Color.dark_gray())
+            color=embed_color
         )
         if jackpot_award > 0:
             desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:g}")

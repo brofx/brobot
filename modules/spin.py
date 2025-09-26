@@ -215,7 +215,7 @@ class SlotsSpinView(discord.ui.View):
 
 class SigmaConfirmView(discord.ui.View):
     def __init__(self, cog: "SlotsCog", user_id: int, est_cost: int, expires_at: int):
-        super().__init__(timeout=60)
+        super().__init__(timeout=None)
         self.cog = cog
         self.user_id = user_id
         self.est_cost = est_cost
@@ -245,7 +245,7 @@ class SigmaConfirmView(discord.ui.View):
 
 class DuelAcceptView(discord.ui.View):
     def __init__(self, cog: "SlotsCog", *, message_id: int, channel_id: int, duel_key: str, initiator_id: int, initiator_fee: int, expires_at: int):
-        super().__init__(timeout=DUEL_TIMEOUT_SECONDS)
+        super().__init__(timeout=None)
         self.cog = cog
         self.message_id = message_id
         self.channel_id = channel_id
@@ -310,7 +310,7 @@ class ResultShareView(discord.ui.View):
         color: discord.Color,
         spin_time: datetime,
     ):
-        super().__init__(timeout=180)
+        super().__init__(timeout=None)
         self.bot = bot
         self.thread_id = thread_id
         self.author_id = author_id

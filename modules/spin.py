@@ -1233,10 +1233,13 @@ class SlotsCog(commands.Cog):
         if remaining < MEGA_SPINS_PER_DAY:
             mega_tok_text += f"\n*+{MEGA_SPINS_PER_DAY} <t:{next_midnight_et_epoch()}:R>*"
 
+        current_loss_streak = int(await self.r.hget(K_MEGA_LOSS_STREAK, user_id) or 0)
+
         embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
         embed.add_field(name="Normal Spins", value=normal_tok_text, inline=True)
         embed.add_field(name="MEGA Spins", value=mega_tok_text, inline=True)
         embed.add_field(name="Total Spins", value=f"{total_spins}", inline=True)
+        embed.add_field(name="MEGA Loss Streak", value=f"{current_loss_streak}", inline=True)
         embed.add_field(name="Current Score", value=f"{total_wins_accum:g}", inline=True)
         # Fetch current rank (0-based) and total ranked players
         pipe = self.r.pipeline()
@@ -1251,7 +1254,7 @@ class SlotsCog(commands.Cog):
             rank_field = f"— of **{total_ranked}**"
 
         # later, when building the embed fields (you already add spins/score), include:
-        embed.add_field(name="Current Rank", value=rank_field, inline=True)
+        embed.add_field(name="Rank", value=rank_field, inline=True)
         embed.timestamp = spin_time
 
         # Add the loss streak to the share message

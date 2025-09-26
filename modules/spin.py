@@ -125,6 +125,17 @@ def next_midnight_et_epoch() -> int:
 def fmt_spin_value(spin_value: int, force: bool = False):
     return f"{spin_value:.3e}" if (spin_value > 1_000_000_000_000 or force) else f"{spin_value:,}"
 
+def ordinal(n: int) -> str:
+    try:
+        n = int(n)
+    except Exception:
+        return str(n)
+    if 10 <= (n % 100) <= 20:
+        suf = "th"
+    else:
+        suf = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suf}"
+
 # Test version
 # def fmt_spin_value(spin_value: int, orig=False):
 #     prefix = ""
@@ -1224,6 +1235,20 @@ class SlotsCog(commands.Cog):
         
         embed.add_field(name="Total Spins", value=f"{total_spins}", inline=True)
         embed.add_field(name="Current Score", value=f"{total_wins_accum:g}", inline=True)
+        # Fetch current rank (0-based) and total ranked players
+        pipe = self.r.pipeline()
+        pipe.zrevrank(K_LEADERBOARD, user_id)
+        pipe.zcard(K_LEADERBOARD)
+        rank_idx, total_ranked = await pipe.execute()
+
+        if rank_idx is not None:
+            rank_field = f"**#{ordinal(rank_idx + 1)}** of **{total_ranked}**"
+        else:
+            # user might not be in the zset yet (e.g., zero score on a normal spin)
+            rank_field = f"— of **{total_ranked}**"
+
+        # later, when building the embed fields (you already add spins/score), include:
+        embed.add_field(name="Current Rank", value=rank_field, inline=True)
         embed.timestamp = spin_time
 
         # Add the loss streak to the share message

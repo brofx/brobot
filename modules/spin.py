@@ -246,10 +246,10 @@ class SigmaConfirmView(discord.ui.View):
         for item in self.children:
             item.disabled = True
         try:
-            await interaction.response.edit_message(content="Σ Sigma cancelled.", view=self)
+            await interaction.response.edit_message(content="Σ Sigma cancelled.", view=self, delete_after=5)
         except Exception:
             try:
-                await interaction.response.send_message("Σ Sigma cancelled.", ephemeral=True)
+                await interaction.response.send_message("Σ Sigma cancelled.", ephemeral=True, delete_after=5)
             except Exception:
                 pass
 
@@ -378,7 +378,7 @@ class ResultShareView(discord.ui.View):
 
         try:
             await channel.send(content=f"Spin by <@{self.author_id}>", embed=embed)
-            await interaction.response.send_message("Shared to the thread. 📣", ephemeral=True)
+            await interaction.response.send_message("Shared to the thread. 📣", ephemeral=True, delete_after=5)
         except Exception as error:
             logger.error(f"Error sharing: %s", error, exc_info=True)
             await interaction.response.send_message("Couldn't post to the thread (permissions/archived?).", ephemeral=True)
@@ -683,7 +683,7 @@ class SlotsCog(commands.Cog):
             logger.info(f"[{user_name}] No Σ Sigma spins available.")
             return await interaction.response.send_message(
                 f"No Σ Sigma available. Next charge **<t:{now + next_in}:R>**.",
-                ephemeral=True
+                ephemeral=True, delete_after=60
             )
 
         # Compute *estimated* cost (we will recompute on confirm)
@@ -693,7 +693,7 @@ class SlotsCog(commands.Cog):
             logger.info(f"[{user_name}] No Σ Sigma spins available, not enough points.")
             return await interaction.response.send_message(
                 f"You need **≥ {cfg.sigma.min_points:,}** points and will be charged **25%** of your balance to spin.",
-                ephemeral=True
+                ephemeral=True, delete_after=30
             )
 
         # Outcomes (weights: medium/lowish/low/very low → 16/8/6/2 mapping)
@@ -709,7 +709,7 @@ class SlotsCog(commands.Cog):
         embed = discord.Embed(title="Σ Sigma Spin — Confirm", description=desc, color=discord.Color.dark_gold())
         expires_at = int(datetime.now(tz=NY_TZ).timestamp()) + 60
         view = SigmaConfirmView(self, user.id, est_cost, expires_at)
-        await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
+        await interaction.response.send_message(embed=embed, ephemeral=True, view=view, delete_after=30)
 
     async def handle_sigma_spin(self, interaction: discord.Interaction):
         """Resolve Sigma spin after user confirms."""
@@ -733,7 +733,7 @@ class SlotsCog(commands.Cog):
             tokens, _ = await self._refill_sigma_tokens(user.id)
             if tokens <= 0:
                 logger.info(f"[{user_name}] No Σ Sigma spins available.")
-                return await interaction.response.send_message("No Σ Sigma available right now.", ephemeral=True)
+                return await interaction.response.send_message("No Σ Sigma available right now.", ephemeral=True, delete_after=10)
             await self.r.decr(K_SIGMA_TOKENS.format(user_id=user.id))
 
             # Recompute cost and verify eligibility
@@ -745,7 +745,7 @@ class SlotsCog(commands.Cog):
                 await self.r.incr(K_SIGMA_TOKENS.format(user_id=user.id))
                 return await interaction.response.send_message(
                     f"Balance changed — you need **≥ {cfg.sigma.min_points:,}** and 25% cost available.",
-                    ephemeral=True
+                    ephemeral=True, delete_after=30
                 )
 
             # Deduct escrow
@@ -876,7 +876,7 @@ class SlotsCog(commands.Cog):
             if interaction.response.is_done():
                 await interaction.followup.send(embed=embed, ephemeral=True)
             else:
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await interaction.response.send_message(embed=embed, ephemeral=True, delete_after=60 * 5)
 
         finally:
             try:
@@ -1000,9 +1000,9 @@ class SlotsCog(commands.Cog):
                 status.timestamp = spin_time
                 logger.info(f"[{user_name}] 🎰 No normal spins available.")
                 if edit_in_place:
-                    return await interaction.response.edit_message(embed=status, view=self._make_result_view(interaction, status))
+                    return await interaction.response.edit_message(embed=status, view=self._make_result_view(interaction, status), delete_after=60 * 10)
                 else:
-                    return await interaction.response.send_message(embed=status, ephemeral=True)
+                    return await interaction.response.send_message(embed=status, ephemeral=True, delete_after=60 * 10)
             # consume one token
             await self.r.decr(K_NORMAL_TOKENS.format(user_id=user.id))
 
@@ -1029,9 +1029,9 @@ class SlotsCog(commands.Cog):
                 msg.timestamp = spin_time
                 logger.info(f"[{user_name}] 🤖 No MEGA spins available.")
                 if edit_in_place:
-                    return await interaction.response.edit_message(embed=msg, view=self._make_result_view(interaction, msg))
+                    return await interaction.response.edit_message(embed=msg, view=self._make_result_view(interaction, msg), delete_after=60 * 10)
                 else:
-                    return await interaction.response.send_message(embed=msg, ephemeral=True)
+                    return await interaction.response.send_message(embed=msg, ephemeral=True, delete_after=60 * 10)
 
             total_points = int(await self.r.hget(K_STATS_WINNINGS, user_id) or 0)
             if total_points <= MEGA_MIN_POINTS:
@@ -1043,9 +1043,9 @@ class SlotsCog(commands.Cog):
                 msg.timestamp = spin_time
                 logger.info(f"[{user_name}] 🤖 No MEGA spins available, not enough points.")
                 if edit_in_place:
-                    return await interaction.response.edit_message(embed=msg, view=self._make_result_view(interaction, msg))
+                    return await interaction.response.edit_message(embed=msg, view=self._make_result_view(interaction, msg), delete_after=60 * 10)
                 else:
-                    return await interaction.response.send_message(embed=msg, ephemeral=True)
+                    return await interaction.response.send_message(embed=msg, ephemeral=True, delete_after=60 * 10)
             # Defer the response for mega spins.
             await interaction.response.defer(ephemeral=not edit_in_place, thinking=not edit_in_place)
             cost = max(1, int(total_points * MEGA_COST_FRACTION))
@@ -1229,9 +1229,9 @@ class SlotsCog(commands.Cog):
         mega_tok_text = f"{remaining}/{MEGA_SPINS_PER_DAY}"
 
         if tok_left < NORMAL_TOKENS_CAP and next_in > 0:
-            normal_tok_text += f"+1 <t:{spin_time_utc_sec + next_in}:R>"
+            normal_tok_text += f" +1 <t:{spin_time_utc_sec + next_in}:R>"
         if remaining < MEGA_SPINS_PER_DAY:
-            mega_tok_text += f"+{MEGA_SPINS_PER_DAY} <t:{next_midnight_et_epoch()}:R>"
+            mega_tok_text += f" +{MEGA_SPINS_PER_DAY} <t:{next_midnight_et_epoch()}:R>"
 
         embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
         embed.add_field(name="Normal Spins", value=normal_tok_text, inline=True)
@@ -1275,12 +1275,12 @@ class SlotsCog(commands.Cog):
             if interaction.response.is_done():
                 await interaction.edit_original_response(embed=embed, view=view)
             else:
-                await interaction.response.edit_message(embed=embed, view=view)
+                await interaction.response.edit_message(embed=embed, view=view, delete_after=60 * 10)
         else:
             if interaction.response.is_done():
                 await interaction.followup.send(embed=embed, ephemeral=True, view=view)
             else:
-                await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
+                await interaction.response.send_message(embed=embed, ephemeral=True, view=view, delete_after=60 * 10)
 
     # Replace your start_duel method with this version (auto-cleans stale mappings before blocking)
     async def start_duel(self, interaction: discord.Interaction):
@@ -1308,13 +1308,13 @@ class SlotsCog(commands.Cog):
             if stale:
                 await self.r.hdel(K_DUEL_ACTIVE_BY_USER, uid)
             else:
-                return await interaction.response.send_message("You already have a pending 1v1 challenge.", ephemeral=True)
+                return await interaction.response.send_message("You already have a pending 1v1 challenge.", ephemeral=True, delete_after=30)
 
         # Fee: 5% of INITIATOR's points (opponent pays the SAME fixed fee)
         points = int(await self.r.hget(K_STATS_WINNINGS, uid) or 0)
         init_fee = max(1, int(points * DUEL_FEE_FRACTION))
         if points < init_fee or init_fee <= 0:
-            return await interaction.response.send_message("Not enough points to start a 1v1.", ephemeral=True)
+            return await interaction.response.send_message("Not enough points to start a 1v1.", ephemeral=True, delete_after=30)
 
         # Deduct initiator's fee now
         pipe = self.r.pipeline()
@@ -1369,7 +1369,7 @@ class SlotsCog(commands.Cog):
         pipe.hset(K_DUEL_ACTIVE_BY_USER, uid, posted.id)
         await pipe.execute()
 
-        await interaction.response.send_message("1v1 challenge posted.", ephemeral=True)
+        await interaction.response.send_message("1v1 challenge posted.", ephemeral=True, delete_after=5)
 
     async def accept_duel(self, interaction: discord.Interaction, view: DuelAcceptView):
         now = int(datetime.now(tz=NY_TZ).timestamp())
@@ -1379,16 +1379,16 @@ class SlotsCog(commands.Cog):
         data = await self.r.get(view.duel_key)
         if not data:
             logger.info(f"[{user_name}] This 1v1 has expired (Unknown 1v1).")
-            return await interaction.response.send_message("This 1v1 has expired.", ephemeral=True)
+            return await interaction.response.send_message("This 1v1 has expired.", ephemeral=True, delete_after=30)
         obj = json.loads(data)
         if obj.get("state") != "open" or now >= int(obj["expires_at"]):
             logger.info(f"[{user_name}] This 1v1 has expired (Not open or is expired).")
-            return await interaction.response.send_message("This 1v1 has expired.", ephemeral=True)
+            return await interaction.response.send_message("This 1v1 has expired.", ephemeral=True, delete_after=30)
 
         initiator_id = int(obj["initiator_id"])
         if interaction.user.id == initiator_id:
             logger.info(f"[{user_name}] You can't accept your own 1v1.")
-            return await interaction.response.send_message("You can't accept your own 1v1.", ephemeral=True)
+            return await interaction.response.send_message("You can't accept your own 1v1.", ephemeral=True, delete_after=10)
 
         # Opponent pays the SAME fixed fee as calculated from the initiator
         init_fee = int(obj["initiator_fee"])
@@ -1397,14 +1397,14 @@ class SlotsCog(commands.Cog):
         if opp_points < init_fee:
             logger.info(f"[{user_name}] Not enough points to 1v1.")
             return await interaction.response.send_message(
-                f"You need at least **{init_fee:g}** points to accept this 1v1.", ephemeral=True
+                f"You need at least **{init_fee:g}** points to accept this 1v1.", ephemeral=True, delete_after=30
             )
         
         # Single accept guard
         lock_key = K_DUEL_LOCK.format(message_id=view.message_id)
         if not await self.r.set(lock_key, "1", ex=DUEL_TIMEOUT_SECONDS, nx=True):
             logger.info(f"[{user_name}] This 1v1 was already accepted or closed.")
-            return await interaction.response.send_message("This 1v1 was already accepted or closed.", ephemeral=True)
+            return await interaction.response.send_message("This 1v1 was already accepted or closed.", ephemeral=True, delete_after=30)
 
         # Deduct opponent fee now
         pipe = self.r.pipeline()
@@ -1539,7 +1539,7 @@ class SlotsCog(commands.Cog):
                 pass
 
         try:
-            await interaction.response.send_message("1v1 resolved — results posted.", ephemeral=True)
+            await interaction.response.send_message("1v1 resolved — results posted.", ephemeral=True, delete_after=5)
         except Exception:
             try:
                 await interaction.followup.send("1v1 resolved — results posted.", ephemeral=True)
@@ -1569,22 +1569,22 @@ class SlotsCog(commands.Cog):
         # Only the initiator can cancel
         if interaction.user.id != view.initiator_id:
             logger.info(f"[{user_name}] Only the challenger can cancel this 1v1.")
-            return await interaction.response.send_message("Only the challenger can cancel this 1v1.", ephemeral=True)
+            return await interaction.response.send_message("Only the challenger can cancel this 1v1.", ephemeral=True, delete_after=30)
 
         # Acquire same lock used by accept to prevent races
         lock_key = K_DUEL_LOCK.format(message_id=view.message_id)
         if not await self.r.set(lock_key, "1", ex=DUEL_TIMEOUT_SECONDS, nx=True):
             logger.info(f"[{user_name}] This 1v1 was already accepted or closed (lock).")
-            return await interaction.response.send_message("This 1v1 was already accepted or closed.", ephemeral=True)
+            return await interaction.response.send_message("This 1v1 was already accepted or closed.", ephemeral=True, delete_after=30)
 
         data = await self.r.get(view.duel_key)
         if not data:
             logger.info(f"[{user_name}] This 1v1 is no longer active")
-            return await interaction.response.send_message("This 1v1 is no longer active.", ephemeral=True)
+            return await interaction.response.send_message("This 1v1 is no longer active.", ephemeral=True, delete_after=30)
         obj = json.loads(data)
         if obj.get("state") != "open":
             logger.info(f"[{user_name}] This 1v1 was already accepted or closed (state).")
-            return await interaction.response.send_message("This 1v1 was already accepted or closed.", ephemeral=True)
+            return await interaction.response.send_message("This 1v1 was already accepted or closed.", ephemeral=True, delete_after=30)
 
         # Mark cancelled & refund initiator's fee
         obj["state"] = "cancelled"
@@ -1617,7 +1617,7 @@ class SlotsCog(commands.Cog):
 
         # Ack
         try:
-            await interaction.response.send_message("1v1 cancelled. Your fee was refunded.", ephemeral=True)
+            await interaction.response.send_message("1v1 cancelled. Your fee was refunded.", ephemeral=True, delete_after=60)
         except Exception:
             try:
                 await interaction.followup.send("1v1 cancelled. Your fee was refunded.", ephemeral=True)

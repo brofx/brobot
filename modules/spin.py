@@ -1226,7 +1226,7 @@ class SlotsCog(commands.Cog):
 
         # Add the loss streak to the share message
         desc_lines.insert(0, loss_streak_text)
-        logger.info("\n\t".join([user_name] + desc_lines))
+        logger.info("\n\t".join([user_name, f"Respin: {edit_in_place}"] + desc_lines))
 
         # view = ResultShareView(
         #     bot=self.bot,

@@ -1078,7 +1078,8 @@ class SlotsCog(commands.Cog):
         )
         # %-I to remove the leading zero is unix specific, %#I works on windows.
 
-        breakdown = [f"{len(breakdown)} matches"]
+        match_count = len(breakdown)
+        breakdown = [f"{match_count} matches"]
         
         # spin_time_str = spin_time.strftime("%B %d, %Y at %-I:%M %p %Z")
 
@@ -1097,8 +1098,8 @@ class SlotsCog(commands.Cog):
             if jackpot_award > 0:
                 _, eff, token = jp
                 breakdown.append(f"💰 **JACKPOT!** {token} reached {eff} (incl. wilds) → +{jackpot_award:,}")
-            else:
-                breakdown.append(f"*{jackpot_contribution:g} added to jackpot*")
+        else:
+            breakdown.append(f"*{jackpot_contribution:g} added to jackpot*")
 
         gross_total = spin_total + jackpot_award
 
@@ -1198,12 +1199,12 @@ class SlotsCog(commands.Cog):
             net_line = f"**Net change:** **{net_delta:g}**"
             desc_lines.extend([gross_line, net_line])
 
-        # if breakdown:
-        #     breakdown_max = 5
-        #     desc_lines += [f"- {line}" for line in breakdown[0:breakdown_max]]
-        #     excluded = max(0, len(breakdown) - breakdown_max)
-        #     if excluded:
-        #         desc_lines.append(f"...and {excluded} more!")
+        if breakdown:
+            breakdown_max = 5
+            desc_lines += [f"- {line}" for line in breakdown[0:breakdown_max]]
+            excluded = max(0, len(breakdown) - breakdown_max)
+            if excluded:
+                desc_lines.append(f"...and {excluded} more!")
 
         desc_lines.append(f"**Total multiplier:** {total_mult:g}×")
 

@@ -1229,9 +1229,9 @@ class SlotsCog(commands.Cog):
         mega_tok_text = f"{remaining}/{MEGA_SPINS_PER_DAY}"
 
         if tok_left < NORMAL_TOKENS_CAP and next_in > 0:
-            normal_tok_text += f" +1 <t:{spin_time_utc_sec + next_in}:R>"
+            normal_tok_text += f"\n*+1 <t:{spin_time_utc_sec + next_in}:R>*"
         if remaining < MEGA_SPINS_PER_DAY:
-            mega_tok_text += f" +{MEGA_SPINS_PER_DAY} <t:{next_midnight_et_epoch()}:R>"
+            mega_tok_text += f"\n*+{MEGA_SPINS_PER_DAY} <t:{next_midnight_et_epoch()}:R>*"
 
         embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
         embed.add_field(name="Normal Spins", value=normal_tok_text, inline=True)

@@ -320,7 +320,7 @@ class ResultShareView(discord.ui.View):
         self.color = color
         self.spin_time = spin_time
 
-    @discord.ui.button(label="🎰 Spin Again", style=discord.ButtonStyle.primary, custom_id="slots:result:spin_again")
+    @discord.ui.button(label="🎰 Spin", style=discord.ButtonStyle.primary, custom_id="slots:result:spin_again")
     async def spin_again(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.author_id:
             return await interaction.response.send_message("Only the original spinner can use these buttons.", ephemeral=True)
@@ -329,7 +329,7 @@ class ResultShareView(discord.ui.View):
             return await interaction.response.send_message("Slots are temporarily unavailable.", ephemeral=True)
         await cog.handle_spin(interaction, mega=False, edit_in_place=True)
 
-    @discord.ui.button(label="🤖 MEGA Again", style=discord.ButtonStyle.success, custom_id="slots:result:mega_again")
+    @discord.ui.button(label="🤖 MEGA Spin", style=discord.ButtonStyle.success, custom_id="slots:result:mega_again")
     async def mega_again(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.author_id:
             return await interaction.response.send_message("Only the original spinner can use these buttons.", ephemeral=True)

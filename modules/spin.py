@@ -984,6 +984,7 @@ class SlotsCog(commands.Cog):
         spin_time_utc_sec = int(spin_time.timestamp())
         date_str = ny_date_str()
         jackpot_contribution = 0
+        cost = 0
 
         # NORMAL spin: enforce cooldown
         if not mega:
@@ -1049,7 +1050,7 @@ class SlotsCog(commands.Cog):
             # Defer the response for mega spins.
             await interaction.response.defer(ephemeral=not edit_in_place, thinking=not edit_in_place)
             cost = max(1, int(total_points * MEGA_COST_FRACTION))
-
+            jackpot_contribution = cost
             # Deduct cost up-front and add to the progressive jackpot
             pipe = self.r.pipeline()
             pipe.hincrbyfloat(K_STATS_WINNINGS, user_id, -cost)
@@ -1076,6 +1077,8 @@ class SlotsCog(commands.Cog):
             cfg, bonus_multiplier=bonus_mult, size=board_size
         )
         # %-I to remove the leading zero is unix specific, %#I works on windows.
+
+        breakdown = [f"{len(breakdown)} matches"]
         
         # spin_time_str = spin_time.strftime("%B %d, %Y at %-I:%M %p %Z")
 
@@ -1094,6 +1097,8 @@ class SlotsCog(commands.Cog):
             if jackpot_award > 0:
                 _, eff, token = jp
                 breakdown.append(f"💰 **JACKPOT!** {token} reached {eff} (incl. wilds) → +{jackpot_award:,}")
+            else:
+                breakdown.append(f"*{jackpot_contribution:g} added to jackpot*")
 
         gross_total = spin_total + jackpot_award
 
@@ -1189,16 +1194,16 @@ class SlotsCog(commands.Cog):
             if loss_bonus_mult > 1:
                 loss_streak_text = f"MEGA loss streak of {streak} = ×{loss_bonus_mult:g}"
             gross_line = f"Gross win: **{gross_total:g}**"
-            cost_line = f"MEGA cost: **-{cost:g}**"
+            #cost_line = f"MEGA cost: **-{cost:g}**"
             net_line = f"**Net change:** **{net_delta:g}**"
-            desc_lines.extend([gross_line, cost_line, net_line])
+            desc_lines.extend([gross_line, net_line])
 
-        if breakdown:
-            breakdown_max = 5
-            desc_lines += [f"- {line}" for line in breakdown[0:breakdown_max]]
-            excluded = max(0, len(breakdown) - breakdown_max)
-            if excluded:
-                desc_lines.append(f"...and {excluded} more!")
+        # if breakdown:
+        #     breakdown_max = 5
+        #     desc_lines += [f"- {line}" for line in breakdown[0:breakdown_max]]
+        #     excluded = max(0, len(breakdown) - breakdown_max)
+        #     if excluded:
+        #         desc_lines.append(f"...and {excluded} more!")
 
         desc_lines.append(f"**Total multiplier:** {total_mult:g}×")
 
@@ -1220,8 +1225,6 @@ class SlotsCog(commands.Cog):
         )
         if jackpot_award > 0:
             desc_lines.append(f"💰 **Jackpot paid:** +{jackpot_award:g}")
-        elif jackpot_contribution:
-            desc_lines.append(f"*{jackpot_contribution:g} added to jackpot*")
         if loss_streak_text:
             embed.add_field(name="Loss Bonus Active", value=loss_streak_text, inline=False)
 

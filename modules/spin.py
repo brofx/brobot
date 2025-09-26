@@ -1036,7 +1036,7 @@ class SlotsCog(commands.Cog):
                 else:
                     return await interaction.response.send_message(embed=msg, ephemeral=True)
             # Defer the response for mega spins.
-            await interaction.response.defer()
+            await interaction.response.defer(ephemeral=True, thinking=True)
             cost = max(1, int(total_points * MEGA_COST_FRACTION))
 
             # Deduct cost up-front and add to the progressive jackpot

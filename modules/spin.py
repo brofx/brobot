@@ -127,7 +127,7 @@ def fmt_spin_value(spin_value: int, force: bool = False):
 
 def self_destruct_text(timeout: int) -> str:
     now_utc = datetime.now(timezone.utc)
-    return f"*This message should self-destruct <t:{now_utc.timestamp() + timeout}:R>*"
+    return f"*This message should self-destruct <t:{int(now_utc.timestamp()) + timeout}:R>*"
 
 def ordinal(n: int) -> str:
     try:

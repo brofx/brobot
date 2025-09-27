@@ -1244,7 +1244,7 @@ class SlotsCog(commands.Cog):
 
         current_loss_streak = int(await self.r.hget(K_MEGA_LOSS_STREAK, user_id) or 0)
 
-        embed.add_field(name="Summary", value="\n".join(desc_lines + [self_destruct_text(60*10)]), inline=False)
+        embed.add_field(name="Summary", value="\n".join(desc_lines), inline=False)
         embed.add_field(name="Normal Spins", value=normal_tok_text, inline=True)
         embed.add_field(name="MEGA Spins", value=mega_tok_text, inline=True)
         embed.add_field(name="Total Spins", value=f"{total_spins}", inline=True)
@@ -1288,12 +1288,12 @@ class SlotsCog(commands.Cog):
             if interaction.response.is_done():
                 await interaction.edit_original_response(embed=embed, view=view)
             else:
-                await interaction.response.edit_message(embed=embed, view=view, delete_after=spin_auto_delete_sec)
+                await interaction.response.edit_message(embed=embed, view=view)
         else:
             if interaction.response.is_done():
                 await interaction.followup.send(embed=embed, ephemeral=True, view=view)
             else:
-                await interaction.response.send_message(embed=embed, ephemeral=True, view=view, delete_after=spin_auto_delete_sec)
+                await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
 
     # Replace your start_duel method with this version (auto-cleans stale mappings before blocking)
     async def start_duel(self, interaction: discord.Interaction):

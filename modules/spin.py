@@ -857,7 +857,7 @@ class SlotsCog(commands.Cog):
 
             embed = discord.Embed(
                 title="Σ Sigma Result",
-                description="\n".join(summary_lines + [f"\n**Cooldown:** {next_line}\n{self_destruct_text(5)}"]),
+                description="\n".join(summary_lines + [f"\n**Cooldown:** {next_line}\n{self_destruct_text(60 * 5)}"]),
                 color=discord.Color.dark_gold(),
                 timestamp=datetime.now(tz=NY_TZ)
             )

@@ -1102,12 +1102,14 @@ class SlotsCog(commands.Cog):
                 jackpot_award = 0
             if jackpot_award > 0:
                 _, eff, token = jp
-                breakdown.append(f"💰 **JACKPOT!** {token} reached {eff} (incl. wilds) → +{jackpot_award:,}")
+                if bonus_mult > 1.0:
+                    breakdown.append(f"💰 **JACKPOT!** {token} reached {eff} (incl. wilds) → {jackpot_award:g} x {bonus_mult:g} = {jackpot_award * bonus_mult:g}")
+                else:
+                    breakdown.append(f"💰 **JACKPOT!** {token} reached {eff} (incl. wilds) → +{jackpot_award:g}")
         else:
             breakdown.append(f"*{jackpot_contribution:g} added to jackpot*")
 
-        gross_total = spin_total + jackpot_award
-
+        gross_total = spin_total + (jackpot_award * bonus_mult)
         net_delta = gross_total - (cost if mega else 0)
 
         await self.r.hincrby(K_STATS_SPINS, user_id, 1)

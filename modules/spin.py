@@ -808,7 +808,7 @@ class SlotsCog(commands.Cog):
                 if recipients:
                     per = distributed // len(recipients)
                     summary_lines.append(f"Outcome: **Spread cost** — {distributed:g} points shared to **{len(recipients)}** others.")
-                    share_thread_note = f"Σ Sigma: <@{uid}> spread **{int(cfg.sigma.cost_fraction * 100)}%** of their balance: **{distributed:g}** to **{len(recipients)}** everyone. Each player receives **{per:g}**."
+                    share_thread_note = f"Σ Sigma: <@{uid}> spread **{int(cfg.sigma.cost_fraction * 100)}%** of their balance: **{distributed:g}** to **{len(recipients)}** players. Each player receives **{per:g}**."
                 else:
                     # no one else to share with → refund
                     pipe = self.r.pipeline()
@@ -838,11 +838,12 @@ class SlotsCog(commands.Cog):
                     await pipe.execute()
 
                     distributed, recipients = await self._sigma_spread_to_all_others(bal_total, initiator_id=int(uid))
+                    per = distributed // len(recipients)
                     summary_lines.append(
                         f"Outcome: **Share entire balance** — distributed {distributed:g} to {len(recipients)} others. "
                         f"(Your cost was refunded.)"
                     )
-                    share_thread_note = f"Σ Sigma: <@{uid}> shared their entire balance of **{distributed:g}** to others."
+                    share_thread_note = f"Σ Sigma: <@{uid}> shared their entire balance of **{distributed:g}** to **{len(recipients)}** players. Each player receives **{per:g}**."
                 else:
                     summary_lines.append("Outcome: **Share entire balance** — nothing to share (balance was 0). Cost was refunded.")
 
